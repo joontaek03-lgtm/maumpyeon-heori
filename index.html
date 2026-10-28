@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>맘편한 허리 프로젝트</title>
+<meta name="description" content="임산부 요통 개선 운동 프로그램 — 요통의 이해, 운동 시 고려사항, 임신 시기별 운동 프로그램">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<style>
+:root{
+  --bg:#F4F6F3; --surface:#FFFFFF; --fg:#1D2B29; --muted:#5B6B67; --line:#D9E1DD;
+  --accent:#2E7A6A; --accent-soft:#DCEBE5; --warm:#C9785F; --warm-soft:#F6E3DA;
+  --display:"Gowun Batang", "Nanum Myeongjo", serif;
+  --body:"Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121A19; --surface:#1A2523; --fg:#E6EEEB; --muted:#9EB0AB; --line:#2C3A37;
+  --accent:#6CC2AE; --accent-soft:#1F3833; --warm:#E59C83; --warm-soft:#3A2722; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121A19; --surface:#1A2523; --fg:#E6EEEB; --muted:#9EB0AB; --line:#2C3A37;
+  --accent:#6CC2AE; --accent-soft:#1F3833; --warm:#E59C83; --warm-soft:#3A2722; color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.75;word-break:keep-all;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+img{max-width:100%}
+[hidden]{display:none!important}
+.wrap{max-width:1040px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--display);line-height:1.3;text-wrap:balance;margin:0}
+p{margin:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:6px}
+.eyebrow{font-size:.78rem;letter-spacing:.12em;font-weight:700;color:var(--accent)}
+
+header.top{position:sticky;top:0;z-index:9;background:var(--bg);border-bottom:1px solid var(--line)}
+header.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-block:12px}
+.brand{font-family:var(--display);font-weight:700;font-size:1.1rem;color:var(--fg);text-decoration:none;background:none;border:0;cursor:pointer;padding:0}
+.crumb{font-size:.88rem;color:var(--muted)}
+
+.hero{padding-block:56px 32px}
+.hero h1{font-size:clamp(2rem,5.5vw,3.2rem);margin-top:12px}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero p.lead{margin-top:16px;font-size:1.05rem;color:var(--muted);max-width:36em}
+
+.menu{padding-block:16px 72px;display:grid;gap:36px}
+.group{display:grid;gap:14px}
+.group-label{font-size:.85rem;font-weight:700;color:var(--muted);letter-spacing:.06em;display:flex;align-items:center;gap:12px}
+.group-label::after{content:"";flex:1;height:1px;background:var(--line)}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media (max-width:760px){.tiles{grid-template-columns:1fr}}
+.tile{font:inherit;text-align:left;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:24px;display:grid;grid-template-rows:auto auto 1fr auto;gap:8px;cursor:pointer;transition:border-color .2s,transform .2s;min-width:0;text-decoration:none}
+.tile:hover{border-color:var(--accent);transform:translateY(-2px)}
+.tile .kicker{font-size:.78rem;font-weight:700;color:var(--accent);letter-spacing:.06em}
+.tile h2{font-size:1.3rem}
+.tile p{font-size:.9rem;color:var(--muted)}
+.tile .go{font-size:.85rem;font-weight:700;color:var(--accent);margin-top:6px}
+.tile.prog{background:var(--accent-soft);border-color:transparent}
+.tile.prog .weeks{font-family:var(--display);font-size:1.9rem;line-height:1.1;color:var(--fg);font-variant-numeric:tabular-nums}
+
+.detail{padding-block:40px 80px;display:grid;gap:32px}
+.back{font:inherit;font-size:.9rem;color:var(--accent);background:none;border:0;padding:0;cursor:pointer;justify-self:start;font-weight:700}
+.d-head{display:grid;gap:10px;padding-bottom:28px;border-bottom:1px solid var(--line)}
+.d-head h1{font-size:clamp(1.8rem,4.5vw,2.6rem)}
+.d-head p{color:var(--muted)}
+.slot{border:1.5px dashed var(--line);border-radius:14px;padding:22px;display:grid;gap:8px;background:var(--surface);min-width:0}
+.slot h3{font-size:1.1rem}
+.slot .ph{color:var(--muted);font-size:.9rem}
+.slots{display:grid;gap:16px}
+.slots.two{grid-template-columns:1fr 1fr}
+.slots.three{grid-template-columns:repeat(3,1fr)}
+@media (max-width:760px){.slots.two,.slots.three{grid-template-columns:1fr}}
+.media{aspect-ratio:16/9;max-width:100%;border-radius:10px;display:grid;place-items:center;color:var(--muted);font-size:.8rem;background:repeating-linear-gradient(135deg,var(--accent-soft) 0 10px,transparent 10px 20px)}
+.pager{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding-top:24px;border-top:1px solid var(--line)}
+.pager button{font:inherit;font-size:.9rem;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:10px 18px;color:var(--fg);cursor:pointer}
+.pager button:hover{border-color:var(--accent)}
+
+footer{padding-block:28px;border-top:1px solid var(--line);font-size:.85rem;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.tile{transition:none}.tile:hover{transform:none}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <button class="brand" type="button" data-go="home">맘편한 허리</button>
+    <span class="crumb" id="crumb"></span>
+  </div>
+</header>
+
+<main>
+  <div id="view-home">
+    <section class="hero">
+      <div class="wrap">
+        <p class="eyebrow">임산부 요통 개선 운동 프로그램</p>
+        <h1>허리가 편해야<br><em>열 달</em>이 편합니다</h1>
+        <p class="lead">[프로그램 소개 문구 입력 예정]</p>
+      </div>
+    </section>
+    <div class="wrap menu">
+      <div class="group">
+        <div class="group-label">알아두기</div>
+        <div class="tiles">
+          <button class="tile" type="button" data-go="cause">
+            <span class="kicker">요통의 이해</span><h2>임산부 요통 유발원인</h2>
+            <p>[한 줄 요약 입력 예정]</p><span class="go">자세히 보기 →</span>
+          </button>
+          <button class="tile" type="button" data-go="symptom">
+            <span class="kicker">요통의 이해</span><h2>주요 증상</h2>
+            <p>[한 줄 요약 입력 예정]</p><span class="go">자세히 보기 →</span>
+          </button>
+          <button class="tile" type="button" data-go="consider">
+            <span class="kicker">안전</span><h2>운동 시 고려사항</h2>
+            <p>[한 줄 요약 입력 예정]</p><span class="go">자세히 보기 →</span>
+          </button>
+        </div>
+      </div>
+      <div class="group">
+        <div class="group-label">시기별 개선 운동 프로그램</div>
+        <div class="tiles">
+          <button class="tile prog" type="button" data-go="early">
+            <span class="kicker">임신 초기</span><span class="weeks">1–13주</span>
+            <p>[한 줄 요약 입력 예정]</p><span class="go">프로그램 보기 →</span>
+          </button>
+          <button class="tile prog" type="button" data-go="mid">
+            <span class="kicker">임신 중기</span><span class="weeks">14–27주</span>
+            <p>[한 줄 요약 입력 예정]</p><span class="go">프로그램 보기 →</span>
+          </button>
+          <button class="tile prog" type="button" data-go="late">
+            <span class="kicker">임신 후기</span><span class="weeks">28–40주</span>
+            <p>[한 줄 요약 입력 예정]</p><span class="go">프로그램 보기 →</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="view-detail" hidden>
+    <div class="wrap detail" id="detail"></div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">맘편한 허리 프로젝트 · 임상운동프로그램 · [운영 정보 입력 예정]</div>
+</footer>
+
+<script>
+const ORDER = ["cause","symptom","consider","early","mid","late"];
+const info = (n) => Array.from({length:n},(_,i)=>`<div class="slot"><h3>[소제목 ${i+1}]</h3><p class="ph">내용 입력 예정</p></div>`).join("");
+const exCards = (label) => `<div class="slots three">${[1,2,3].map(i=>`
+  <div class="slot"><div class="media">사진 · 영상</div><h3>[${label} ${i}]</h3><p class="ph">방법 · 세트/횟수 · 주의점 입력 예정</p></div>`).join("")}</div>`;
+const program = () => `
+  <div class="slot"><h3>프로그램 개요</h3><p class="ph">목표 · 빈도 · 강도 · 시간 입력 예정</p></div>
+  <h2>준비운동</h2>${exCards("준비운동")}
+  <h2>본운동</h2>${exCards("본운동")}
+  <h2>정리운동</h2>${exCards("정리운동")}
+  <div class="slot"><h3>이 시기 주의사항</h3><p class="ph">내용 입력 예정</p></div>`;
+
+const PAGES = {
+  cause:   {kicker:"요통의 이해", title:"임산부 요통 유발원인", body:()=>`<div class="slots two">${info(4)}</div>`},
+  symptom: {kicker:"요통의 이해", title:"주요 증상", body:()=>`<div class="slots two">${info(4)}</div>`},
+  consider:{kicker:"안전", title:"운동 시 고려사항", body:()=>`<div class="slots two">${info(4)}</div>`},
+  early:   {kicker:"임신 초기 · 1–13주", title:"임신 초기 개선 운동 프로그램", body:program},
+  mid:     {kicker:"임신 중기 · 14–27주", title:"임신 중기 개선 운동 프로그램", body:program},
+  late:    {kicker:"임신 후기 · 28–40주", title:"임신 후기 개선 운동 프로그램", body:program},
+};
+
+const home = document.getElementById("view-home"), det = document.getElementById("view-detail"),
+      box = document.getElementById("detail"), crumb = document.getElementById("crumb");
+
+function show(id){
+  const p = PAGES[id];
+  if(!p){ home.hidden=false; det.hidden=true; crumb.textContent=""; document.title="맘편한 허리 프로젝트"; window.scrollTo(0,0); return; }
+  const i = ORDER.indexOf(id), prev = ORDER[i-1], next = ORDER[i+1];
+  box.innerHTML = `
+    <button class="back" type="button" data-go="home">← 처음으로</button>
+    <div class="d-head"><p class="eyebrow">${p.kicker}</p><h1>${p.title}</h1><p>[페이지 소개 문구 입력 예정]</p></div>
+    ${p.body()}
+    <div class="pager">
+      ${prev?`<button type="button" data-go="${prev}">← ${PAGES[prev].title}</button>`:"<span></span>"}
+      ${next?`<button type="button" data-go="${next}">${PAGES[next].title} →</button>`:""}
+    </div>`;
+  home.hidden=true; det.hidden=false; crumb.textContent=p.title;
+  document.title = p.title + " · 맘편한 허리 프로젝트";
+  window.scrollTo(0,0);
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-go]"); if(!b) return;
+  const id = b.dataset.go;
+  const url = id==="home" ? location.pathname : "#"+id;
+  try { history.pushState(null,"", url); } catch(_){}
+  show(id);
+});
+// 브라우저 뒤로가기/앞으로가기 지원
+window.addEventListener("popstate", () => show((location.hash||"").slice(1)));
+show((location.hash||"").slice(1));
+</script>
+</body>
+</html>
