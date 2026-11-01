@@ -3,9 +3,14 @@
     "allow": [
       "Bash",
       "mcp__Notion",
+      "mcp__claude-code-remote",
       "Read",
       "Edit",
-      "Write"
+      "Write",
+      "Glob",
+      "Grep",
+      "Skill",
+      "ToolSearch"
     ]
   }
 }
