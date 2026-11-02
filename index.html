@@ -299,6 +299,22 @@ footer b{color:var(--ink-fg)}
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none !important;transition:none !important}
 }
+/* cinematic intro: 스크롤하면 집 → 방 → 매트 → 호흡 장면으로 카메라가 이어서 들어감 */
+.cine{position:relative;height:520vh;background:#1a1410}
+.cine-stage{position:sticky;top:0;height:100vh;height:100svh;overflow:hidden}
+.cine-l{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;will-change:transform,opacity}
+.cine-l:first-child{opacity:1}
+.cine-flash{position:absolute;inset:0;background:#FFF4E6;opacity:0;pointer-events:none}
+.cine-shade{position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(20,14,10,.35) 0%,rgba(20,14,10,0) 30%,rgba(20,14,10,0) 50%,rgba(20,14,10,.6) 100%)}
+.cine-cap{position:absolute;left:0;right:0;bottom:12vh;padding:0 max(24px,env(safe-area-inset-left,0px));text-align:center;color:#FFF8F0;opacity:0;text-shadow:0 2px 24px rgba(0,0,0,.45);pointer-events:none}
+.cine-cap.on{pointer-events:auto}
+.cine-cap p{font-size:13px;font-weight:700;letter-spacing:.18em;color:#F7D2B4}
+.cine-cap h2{font-size:clamp(1.9rem,5.4vw,3.6rem);margin-top:10px}
+.cine-cap span{display:block;margin-top:12px;font-size:17px;opacity:.9}
+.cine-cap .btn{margin-top:22px;text-shadow:none}
+.cine-hint{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);color:#FFF8F0;font-size:12px;letter-spacing:.2em;opacity:.8;display:flex;flex-direction:column;align-items:center;gap:6px}
+.cine-hint::after{content:"";width:1px;height:28px;background:currentColor;animation:float 1.6s ease-in-out infinite}
+.cine-bar{position:absolute;left:0;top:0;height:3px;background:#F7B98F;width:0}
 </style>
 </head>
 <body>
@@ -500,7 +516,21 @@ function homeHTML(){
       <ul>${li(p.points)}</ul>
       <span class="go">운동 ${countOf(id)}가지 보기${ARROW}</span>
     </button>`; }).join('');
-  return `<div class="view-in"><div class="wrap">
+  return `<section class="cine" id="cine" aria-label="맘편한 허리 소개 장면">
+    <div class="cine-stage">
+      <img class="cine-l" src="media/s1.webp" alt="아침 햇살이 드는 집" style="object-position:40% 60%">
+      <img class="cine-l" src="media/s2.webp" alt="햇살이 들어오는 거실" style="object-position:30% 50%">
+      <img class="cine-l" src="media/s3.webp" alt="창가에 펼쳐진 요가 매트" style="object-position:55% 60%">
+      <img class="cine-l" src="media/s4.webp" alt="매트에 앉아 호흡하는 임산부" style="object-position:55% 60%">
+      <div class="cine-flash"></div><div class="cine-shade"></div>
+      <div class="cine-cap"><p>MORNING</p><h2 class="disp">아침 햇살이 드는 집</h2><span>열 달의 하루가 또 시작됩니다</span></div>
+      <div class="cine-cap"><p>40.5%</p><h2 class="disp">허리가 먼저 알아챕니다</h2><span>임산부 열 명 중 네 명이 요통을 겪어요</span></div>
+      <div class="cine-cap"><p>20 MINUTES</p><h2 class="disp">하루 20분, 매트 위에서</h2><span>시기에 맞는 안전한 자세만 골랐어요</span></div>
+      <div class="cine-cap"><p>BREATHE</p><h2 class="disp">허리가 편해야 열 달이 편합니다</h2><span>지금, 함께 호흡해 볼까요?</span><button class="btn pri" type="button" data-scroll="finder">내 주수에 맞는 운동 찾기${ARROW}</button></div>
+      <div class="cine-hint">SCROLL</div><div class="cine-bar"></div>
+    </div>
+  </section>
+  <div class="view-in"><div class="wrap">
   <section class="hero">
     <div>
       <p class="eyebrow a1">임산부 요통 개선 운동 프로그램</p>
@@ -747,7 +777,7 @@ function show(id){
   if(!PAGES[id] && !PROGS[id]) id = 'home';
   nav.innerHTML = NAV.map(n => `<button type="button" class="pill${n[0]===id?' on':''}" data-go="${n[0]}"${n[0]===id?' aria-current="page"':''}>${n[1]}</button>`).join('');
   if(id === 'home'){
-    app.innerHTML = homeHTML(); setWeek(week); countUp();
+    app.innerHTML = homeHTML(); setWeek(week); countUp(); requestAnimationFrame(() => cine());
   } else {
     const i = ORDER.indexOf(id), prev = ORDER[i-1], next = ORDER[i+1];
     const body = PROGS[id] ? progHTML(id) : PAGES[id].html();
@@ -773,7 +803,39 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('input', e => { if(e.target.id === 'wk-range') setWeek(parseInt(e.target.value, 10) || 1); });
 window.addEventListener('hashchange', () => show(location.hash.slice(1)));
+/* ---------- 시네마틱 인트로: 스크롤 위치 → 장면 전환 ---------- */
+const clamp = v => Math.max(0, Math.min(1, v));
+const ORIGINS = ['45% 58%', '35% 55%', '55% 65%', '55% 65%'];
+let cineTick = false;
+function cine(){
+  cineTick = false;
+  const sec = document.getElementById('cine'); if(!sec) return;
+  const r = sec.getBoundingClientRect(), n = 4, f = .35;
+  const p = clamp(-r.top / (r.height - innerHeight)), x = p * n;
+  const L = sec.querySelectorAll('.cine-l'), C = sec.querySelectorAll('.cine-cap');
+  // 3·4번 장면은 같은 구도라 같은 배율로 겹쳐야 사람이 '나타나는' 느낌이 됨
+  const zoom34 = 1 + .22 * clamp((x - 2 + f) / (2 + f));
+  L.forEach((el, i) => {
+    const s = i < 2 ? 1 + .32 * clamp((x - i + f) / (1 + f)) : zoom34;
+    el.style.opacity = i ? clamp((x - i + f) / f) : 1;
+    el.style.transformOrigin = ORIGINS[i];
+    el.style.transform = reduce ? '' : `scale(${s})`;
+  });
+  sec.querySelector('.cine-flash').style.opacity = .75 * Math.max(0, 1 - Math.abs(x - 1 + f / 2) / (f / 2));
+  C.forEach((el, i) => {
+    const t = x - i, o = i === n - 1 ? clamp((t - .15) / .15) : Math.min(clamp((t - .12) / .15), clamp((.88 - t) / .15));
+    el.style.opacity = o; el.classList.toggle('on', o > .5);
+    el.style.transform = reduce ? '' : `translateY(${(1 - o) * 18}px)`;
+  });
+  sec.querySelector('.cine-hint').style.opacity = clamp(1 - p * 25) * .8;
+  sec.querySelector('.cine-bar').style.width = p * 100 + '%';
+}
+const cineReq = () => { if(!cineTick){ cineTick = true; requestAnimationFrame(cine); } };
+addEventListener('scroll', cineReq, {passive: true});
+addEventListener('resize', cineReq);
+
 show(location.hash.slice(1));
+cine();
 </script>
 
 </body>
