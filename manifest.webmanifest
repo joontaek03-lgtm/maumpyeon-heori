@@ -1,0 +1,19 @@
+{
+  "name": "맘편한 허리 프로젝트",
+  "short_name": "맘편한 허리",
+  "description": "임산부 요통을 줄이는 임신 시기별 운동 프로그램과 원인·증상·안전 수칙 안내",
+  "lang": "ko",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FBF8F4",
+  "theme_color": "#2E7A6A",
+  "categories": ["health", "fitness", "medical"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

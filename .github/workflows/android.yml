@@ -1,0 +1,65 @@
+name: 안드로이드 앱 빌드
+
+on:
+  push:
+    branches: [main, 'claude/**']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: 웹 파일 복사 · 앱에 동기화
+        run: |
+          npm ci
+          npm run sync
+
+      - name: 서명 키 준비 (비밀값이 있을 때만)
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+            echo "서명 키 있음: 스토어용 AAB를 서명합니다"
+          else
+            echo "서명 키 없음: 테스트용 APK만 만듭니다"
+          fi
+
+      - name: 빌드
+        working-directory: android
+        env:
+          VERSION_CODE: ${{ github.run_number }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          if [ -n "$ANDROID_KEYSTORE_PATH" ]; then ./gradlew bundleRelease --no-daemon; fi
+
+      - name: 테스트용 APK 올리기 (휴대폰에 바로 설치)
+        uses: actions/upload-artifact@v4
+        with:
+          name: maumpyeon-heori-test-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+
+      - name: 스토어용 AAB 올리기
+        if: env.ANDROID_KEYSTORE_PATH != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: maumpyeon-heori-play-aab
+          path: android/app/build/outputs/bundle/release/*.aab

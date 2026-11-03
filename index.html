@@ -6,6 +6,16 @@
 <meta name="description" content="임산부 요통을 줄이는 임신 시기별 운동 프로그램과 원인·증상·안전 수칙 안내">
 <style>:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>맘편한 허리 프로젝트</title>
+<meta name="theme-color" content="#FBF8F4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131A19" media="(prefers-color-scheme: dark)">
+<meta name="format-detection" content="telephone=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="맘편한 허리">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
@@ -55,7 +65,7 @@ p{margin:0} ul,ol{margin:0;padding:0}
 .wrap{max-width:1120px;margin:0 auto;padding-left:max(32px,env(safe-area-inset-left,0px));padding-right:max(32px,env(safe-area-inset-right,0px))}
 .eyebrow{font-size:13px;font-weight:700;letter-spacing:.14em;color:var(--early)}
 .muted{color:var(--muted)}
-button{font:inherit;cursor:pointer;color:inherit}
+button{font:inherit;cursor:pointer;color:inherit;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 a{color:var(--early)}
 :focus-visible{outline:3px solid var(--early);outline-offset:3px;border-radius:8px}
 
@@ -293,8 +303,32 @@ footer b{color:var(--ink-fg)}
   .seg span{display:none}
   .wk{font-size:52px}
   .subnav{position:static}
-  .top-in{gap:6px}
-  .pill{padding:6px 10px;font-size:14px}
+  /* 휴대폰: 상단 메뉴를 한 줄로, 옆으로 밀어서 보기 */
+  .top-in{flex-wrap:nowrap;flex-direction:column;align-items:stretch;gap:2px;padding-block:6px 4px}
+  .brand{min-height:40px}
+  .brand-mark{width:30px;height:30px}
+  .brand b{font-size:17px}
+  .nav{flex-wrap:nowrap;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin-inline:-16px;padding-inline:16px;padding-bottom:4px;mask-image:linear-gradient(90deg,transparent 0,#000 16px,#000 calc(100% - 24px),transparent 100%);-webkit-mask-image:linear-gradient(90deg,transparent 0,#000 16px,#000 calc(100% - 24px),transparent 100%)}
+  .nav::-webkit-scrollbar{display:none}
+  .pill{flex:none;scroll-snap-align:center;padding:6px 14px;font-size:15px;min-height:40px;white-space:nowrap}
+  .range{height:40px}
+  .hero{padding-block:32px 28px;gap:28px}
+  .sec{padding-bottom:64px}
+  .stats{margin-bottom:64px}
+  .d-hero{padding-block:20px 32px;border-radius:0 0 28px 28px}
+  .d-body{padding-block:40px 32px;gap:56px}
+  .pager{padding-bottom:calc(40px + env(safe-area-inset-bottom,0px))}
+  .pager button{flex:1 1 100%}
+  .card,.ex,.pcard,.tile{padding:22px}
+}
+/* 터치 화면에서는 눌린 뒤 떠 있는 hover 효과를 끔 */
+@media (hover:none){
+  .pcard:hover,.tile:hover,.card:hover,.ex:hover,.btn.pri:hover,.pager button:hover{transform:none;box-shadow:none}
+  .btn:hover svg,.pcard:hover .go svg{transform:none}
+}
+/* 설치한 앱(홈 화면)으로 열었을 때 */
+@media (display-mode:standalone){
+  body{overscroll-behavior-y:none}
 }
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none !important;transition:none !important}
@@ -336,6 +370,7 @@ footer b{color:var(--ink-fg)}
   <div class="wrap">
     <span><b>맘편한 허리 프로젝트</b> · 상명대학교 스포츠건강관리전공 ONE CORE (홍준택 · 김민재 · 김정민 · 안종환 · 이수아)</span>
     <span>이 페이지의 정보는 교육 목적입니다. 운동을 시작하기 전 담당 산부인과 전문의와 상의하세요.</span>
+    <a href="privacy.html" style="color:inherit">개인정보처리방침</a>
   </div>
 </footer>
 
@@ -776,6 +811,8 @@ function countUp(){
 function show(id){
   if(!PAGES[id] && !PROGS[id]) id = 'home';
   nav.innerHTML = NAV.map(n => `<button type="button" class="pill${n[0]===id?' on':''}" data-go="${n[0]}"${n[0]===id?' aria-current="page"':''}>${n[1]}</button>`).join('');
+  const on = nav.querySelector('.on');
+  if(on && nav.scrollWidth > nav.clientWidth) nav.scrollLeft = on.offsetLeft - (nav.clientWidth - on.offsetWidth) / 2;
   if(id === 'home'){
     app.innerHTML = homeHTML(); setWeek(week); countUp(); requestAnimationFrame(() => cine());
   } else {
@@ -836,6 +873,21 @@ addEventListener('resize', cineReq);
 
 show(location.hash.slice(1));
 cine();
+
+/* ---------- 앱 · 오프라인 ---------- */
+const CAP = window.Capacitor;
+if(CAP && CAP.isNativePlatform && CAP.isNativePlatform()){
+  // 안드로이드 뒤로 가기: 이전 화면 → 처음 화면 → 앱 종료
+  const A = CAP.Plugins && CAP.Plugins.App;
+  if(A) A.addListener('backButton', () => {
+    if(location.hash && location.hash !== '#'){
+      try { history.replaceState(null, '', location.pathname + location.search); } catch(_){}
+      show('home');
+    } else A.exitApp();
+  });
+} else if('serviceWorker' in navigator && location.protocol === 'https:'){
+  addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}
 </script>
 
 </body>

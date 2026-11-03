@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">맘편한 허리</string>
+    <string name="title_activity_main">맘편한 허리</string>
+    <string name="package_name">kr.onecore.maumpyeonheori</string>
+    <string name="custom_url_scheme">kr.onecore.maumpyeonheori</string>
+</resources>
