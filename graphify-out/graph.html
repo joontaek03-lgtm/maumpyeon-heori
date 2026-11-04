@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>graphify - graphify-out/graph.html</title>
+<script src="https://unpkg.com/vis-network@9.1.6/standalone/umd/vis-network.min.js"
+        integrity="sha384-Ux6phic9PEHJ38YtrijhkzyJ8yQlH8i/+buBR8s3mAZOJrP1gwyvAcIYl3GWtpX1"
+        crossorigin="anonymous"></script>
+<style>
+  :root {
+    --bg: #0f0f1a; --panel: #1a1a2e; --border: #2a2a4e; --input-border: #3a3a5e;
+    --text: #e0e0e0; --text-2: #aaa; --text-3: #ccc; --muted: #555; --count: #666;
+    --neighbor-border: #333; --node-label: #ffffff;
+  }
+  [data-theme="light"] {
+    --bg: #ffffff; --panel: #f8f9fa; --border: #d9dee5; --input-border: #c3cad4;
+    --text: #222222; --text-2: #666666; --text-3: #333333; --muted: #888888; --count: #777777;
+    --neighbor-border: #ccc; --node-label: #222222;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; display: flex; height: 100vh; overflow: hidden; }
+  #graph { flex: 1; }
+  #sidebar { width: 280px; background: var(--panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
+  #search-wrap { padding: 12px; border-bottom: 1px solid var(--border); }
+  #search { width: 100%; background: var(--bg); border: 1px solid var(--input-border); color: var(--text); padding: 7px 10px; border-radius: 6px; font-size: 13px; outline: none; }
+  #search:focus { border-color: #4E79A7; }
+  #search-results { max-height: 140px; overflow-y: auto; padding: 4px 12px; border-bottom: 1px solid var(--border); display: none; }
+  .search-item { padding: 4px 6px; cursor: pointer; border-radius: 4px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .search-item:hover { background: var(--border); }
+  #info-panel { padding: 14px; border-bottom: 1px solid var(--border); min-height: 140px; }
+  #info-panel h3 { font-size: 13px; color: var(--text-2); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+  #info-content { font-size: 13px; color: var(--text-3); line-height: 1.6; }
+  #info-content .field { margin-bottom: 5px; }
+  #info-content .field b { color: var(--text); }
+  #info-content .empty { color: var(--muted); font-style: italic; }
+  .neighbor-link { display: block; padding: 2px 6px; margin: 2px 0; border-radius: 3px; cursor: pointer; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 3px solid var(--neighbor-border); }
+  .neighbor-link:hover { background: var(--border); }
+  #neighbors-list { max-height: 160px; overflow-y: auto; margin-top: 4px; }
+  #legend-wrap { flex: 1; overflow-y: auto; padding: 12px; }
+  #legend-wrap h3 { font-size: 13px; color: var(--text-2); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .legend-item { display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; border-radius: 4px; font-size: 12px; }
+  .legend-item:hover { background: var(--border); padding-left: 4px; }
+  .legend-item.dimmed { opacity: 0.35; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+  .legend-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .legend-count { color: var(--count); font-size: 11px; }
+  #stats { padding: 10px 14px; border-top: 1px solid var(--border); font-size: 11px; color: var(--muted); }
+  #legend-controls { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 4px 0; }
+  #legend-controls label { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 12px; color: var(--text-2); user-select: none; }
+  #legend-controls label:hover { color: var(--text); }
+  .legend-cb, #select-all-cb { appearance: none; -webkit-appearance: none; width: 14px; height: 14px; border: 1.5px solid var(--input-border); border-radius: 3px; background: var(--bg); cursor: pointer; position: relative; flex-shrink: 0; }
+  .legend-cb:checked, #select-all-cb:checked { background: #4E79A7; border-color: #4E79A7; }
+  .legend-cb:checked::after, #select-all-cb:checked::after { content: ''; position: absolute; left: 3.5px; top: 1px; width: 4px; height: 7px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+  #select-all-cb:indeterminate { background: #4E79A7; border-color: #4E79A7; }
+  #select-all-cb:indeterminate::after { content: ''; position: absolute; left: 2px; top: 5px; width: 8px; height: 2px; background: #fff; border: none; transform: none; }
+  #theme-wrap { display: flex; gap: 4px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+  #theme-wrap button { flex: 1; background: var(--bg); color: var(--text-2); border: 1px solid var(--input-border); border-radius: 4px; padding: 3px 0; font-size: 11px; cursor: pointer; }
+  #theme-wrap button:hover { color: var(--text); }
+  #theme-wrap button[aria-pressed="true"] { background: #4E79A7; border-color: #4E79A7; color: #fff; }
+</style>
+<script id="graphify-theme-init">
+// Apply the saved theme before first paint (#3894). No saved choice keeps the
+// historical dark look; "system" follows prefers-color-scheme.
+(function () {
+  var pref = null;
+  try { pref = localStorage.getItem('graphify-theme'); } catch (e) {}
+  var t = pref === 'light' ? 'light'
+    : pref === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light'
+    : 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+})();
+</script>
+</head>
+<body>
+<div id="graph"></div>
+<div id="sidebar">
+  <div id="theme-wrap" role="group" aria-label="Theme">
+    <button type="button" data-theme-choice="light">Light</button>
+    <button type="button" data-theme-choice="dark">Dark</button>
+    <button type="button" data-theme-choice="system">System</button>
+  </div>
+  <div id="search-wrap">
+    <input id="search" type="text" placeholder="Search nodes..." autocomplete="off">
+    <div id="search-results"></div>
+  </div>
+  <div id="info-panel">
+    <h3>Node Info</h3>
+    <div id="info-content"><span class="empty">Click a node to inspect it</span></div>
+  </div>
+  <div id="legend-wrap">
+    <h3>Communities</h3>
+    <div id="legend-controls">
+      <label><input type="checkbox" id="select-all-cb" checked onchange="toggleAllCommunities(!this.checked)">Select All</label>
+    </div>
+    <div id="legend"></div>
+  </div>
+  <div id="stats">75 nodes &middot; 89 edges &middot; 11 communities</div>
+</div>
+<script>
+const RAW_NODES = [{"id": "claude_10\ud68c_\uc9c4\ucc99_\ub9ac\ud3ec\ud2b8", "label": "10\ud68c \uc9c4\ucc99 \ub9ac\ud3ec\ud2b8", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "10\ud68c \uc9c4\ucc99 \ub9ac\ud3ec\ud2b8", "community": 0, "community_name": "\uc218\uc5c5 \ud398\uc774\uc9c0 \uc791\uc131 \uaddc\uce59", "source_file": "CLAUDE.md", "file_type": "concept", "degree": 2}, {"id": "claude_\uad6c\uae00_\uce98\ub9b0\ub354", "label": "\uad6c\uae00 \uce98\ub9b0\ub354 \uc218\uc5c5 \uc77c\uc815", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "\uad6c\uae00 \uce98\ub9b0\ub354 \uc218\uc5c5 \uc77c\uc815", "community": 0, "community_name": "\uc218\uc5c5 \ud398\uc774\uc9c0 \uc791\uc131 \uaddc\uce59", "source_file": "CLAUDE.md", "file_type": "concept", "degree": 1}, {"id": "claude_\ub178\uc158_\ud68c\uc6d0\uad00\ub9ac", "label": "\ub178\uc158 \ud68c\uc6d0\uad00\ub9ac", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "\ub178\uc158 \ud68c\uc6d0\uad00\ub9ac", "community": 0, "community_name": "\uc218\uc5c5 \ud398\uc774\uc9c0 \uc791\uc131 \uaddc\uce59", "source_file": "CLAUDE.md", "file_type": "concept", "degree": 1}, {"id": "claude_\ubd80\uc704\ubcc4_\uc6b4\ub3d9_\ubaa8\uc74c", "label": "\ubd80\uc704\ubcc4 \uc6b4\ub3d9 \ubaa8\uc74c \ud398\uc774\uc9c0", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "\ubd80\uc704\ubcc4 \uc6b4\ub3d9 \ubaa8\uc74c \ud398\uc774\uc9c0", "community": 0, "community_name": "\uc218\uc5c5 \ud398\uc774\uc9c0 \uc791\uc131 \uaddc\uce59", "source_file": "CLAUDE.md", "file_type": "concept", "degree": 1}, {"id": "claude_\ube60\ub978_\uba54\ubaa8\ud568", "label": "\u26a1 \ube60\ub978 \uba54\ubaa8\ud568", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "\u26a1 \ube60\ub978 \uba54\ubaa8\ud568", "community": 0, "community_name": "\uc218\uc5c5 \ud398\uc774\uc9c0 \uc791\uc131 \uaddc\uce59", "source_file": "CLAUDE.md", "file_type": "concept", "degree": 2}, {"id": "claude_\uc218\uc5c5_\ud398\uc774\uc9c0", "label": "\uc218\uc5c5 \ud398\uc774\uc9c0 (M/D \uc218\uc5c5 \ub0b4\uc6a9(\ubd80\uc704))", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 40.0, "font": {"size": 12, "color": "#ffffff"}, "title": "\uc218\uc5c5 \ud398\uc774\uc9c0 (M/D \uc218\uc5c5 \ub0b4\uc6a9(\ubd80\uc704))", "community": 0, "community_name": "\uc218\uc5c5 \ud398\uc774\uc9c0 \uc791\uc131 \uaddc\uce59", "source_file": "CLAUDE.md", "file_type": "concept", "degree": 10}, {"id": "claude_\uc624\ub298\uc758_\uc218\uc5c5_\uc900\ube44", "label": "\ud83c\udfcb\ufe0f \uc624\ub298\uc758 \uc218\uc5c5 \uc900\ube44 (\ub9e4\uc77c \uc624\uc804)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "\ud83c\udfcb\ufe0f \uc624\ub298\uc758 \uc218\uc5c5 \uc900\ube44 (\ub9e4\uc77c \uc624\uc804)", "community": 0, "community_name": "\uc218\uc5c5 \ud398\uc774\uc9c0 \uc791\uc131 \uaddc\uce59", "source_file": "CLAUDE.md", "file_type": "concept", "degree": 2}, {"id": "claude_\uc9c0\ub09c_\uc218\uc5c5\uacfc_\ube44\uad50", "label": "\ud83d\udcc8 \uc9c0\ub09c \uc218\uc5c5\uacfc \ube44\uad50 callout", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "\ud83d\udcc8 \uc9c0\ub09c \uc218\uc5c5\uacfc \ube44\uad50 callout", "community": 0, "community_name": "\uc218\uc5c5 \ud398\uc774\uc9c0 \uc791\uc131 \uaddc\uce59", "source_file": "CLAUDE.md", "file_type": "concept", "degree": 2}, {"id": "claude_\uce74\ud1a1_\uc694\uc57d_\uba54\uc2dc\uc9c0", "label": "\uce74\ud1a1 \uc694\uc57d \uba54\uc2dc\uc9c0", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "\uce74\ud1a1 \uc694\uc57d \uba54\uc2dc\uc9c0", "community": 0, "community_name": "\uc218\uc5c5 \ud398\uc774\uc9c0 \uc791\uc131 \uaddc\uce59", "source_file": "CLAUDE.md", "file_type": "concept", "degree": 1}, {"id": "claude_\ud1b5\uc99d_\uae30\ub85d", "label": "\u26a0\ufe0f \ud1b5\uc99d \uae30\ub85d callout", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "\u26a0\ufe0f \ud1b5\uc99d \uae30\ub85d callout", "community": 0, "community_name": "\uc218\uc5c5 \ud398\uc774\uc9c0 \uc791\uc131 \uaddc\uce59", "source_file": "CLAUDE.md", "file_type": "concept", "degree": 1}, {"id": "claude_\uae00\uc4f0\uae30_\uaddc\uce59", "label": "\uae00\uc4f0\uae30 \uaddc\uce59 (\uc26c\uc6b4 \ub9d0\u00b7\uc9c0\uc5b4\ub0b4\uc9c0 \uc54a\uae30)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "\uae00\uc4f0\uae30 \uaddc\uce59 (\uc26c\uc6b4 \ub9d0\u00b7\uc9c0\uc5b4\ub0b4\uc9c0 \uc54a\uae30)", "community": 0, "community_name": "\uc218\uc5c5 \ud398\uc774\uc9c0 \uc791\uc131 \uaddc\uce59", "source_file": "CLAUDE.md", "file_type": "rationale", "degree": 1}, {"id": "claude_ffmpeg", "label": "ffmpeg", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "ffmpeg", "community": 1, "community_name": "\ub178\uc158 DB\u00b7\uc601\uc0c1 \ucc98\ub9ac", "source_file": "CLAUDE.md", "file_type": "concept", "degree": 2}, {"id": "claude_\uc0c1\ub2f4_\ub0b4\uc6a9", "label": "\uc0c1\ub2f4 \ub0b4\uc6a9 \ud398\uc774\uc9c0", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "\uc0c1\ub2f4 \ub0b4\uc6a9 \ud398\uc774\uc9c0", "community": 1, "community_name": "\ub178\uc158 DB\u00b7\uc601\uc0c1 \ucc98\ub9ac", "source_file": "CLAUDE.md", "file_type": "concept", "degree": 2}, {"id": "claude_\uc218\uc5c5_\uae30\ub85d_db", "label": "\ud83d\udcd2 \uc218\uc5c5 \uae30\ub85d (DB)", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 19.0, "font": {"size": 12, "color": "#ffffff"}, "title": "\ud83d\udcd2 \uc218\uc5c5 \uae30\ub85d (DB)", "community": 1, "community_name": "\ub178\uc158 DB\u00b7\uc601\uc0c1 \ucc98\ub9ac", "source_file": "CLAUDE.md", "file_type": "concept", "degree": 3}, {"id": "claude_\uc601\uc0c1_\uc5c5\ub85c\ub4dc_\ubc29\ubc95", "label": "\uc601\uc0c1 \uc5c5\ub85c\ub4dc \ubc29\ubc95 (ffmpeg \u2192 Notion file upload)", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "\uc601\uc0c1 \uc5c5\ub85c\ub4dc \ubc29\ubc95 (ffmpeg \u2192 Notion file upload)", "community": 1, "community_name": "\ub178\uc158 DB\u00b7\uc601\uc0c1 \ucc98\ub9ac", "source_file": "CLAUDE.md", "file_type": "concept", "degree": 2}, {"id": "claude_\uc601\uc0c1_\uc74c\uc131_\ubc1b\uc544\uc4f0\uae30", "label": "\uc601\uc0c1 \uc74c\uc131 \ubc1b\uc544\uc4f0\uae30 (faster-whisper)", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "\uc601\uc0c1 \uc74c\uc131 \ubc1b\uc544\uc4f0\uae30 (faster-whisper)", "community": 1, "community_name": "\ub178\uc158 DB\u00b7\uc601\uc0c1 \ucc98\ub9ac", "source_file": "CLAUDE.md", "file_type": "concept", "degree": 2}, {"id": "claude_\uc6b4\ub3d9\ubcc4_\ube14\ub85d", "label": "\uc6b4\ub3d9\ubcc4 \ube14\ub85d (\uc601\uc0c1\u00b7\ubaa9\uc801\u00b7\uccb4\ud06c \ud3ec\uc778\ud2b8)", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 25.0, "font": {"size": 12, "color": "#ffffff"}, "title": "\uc6b4\ub3d9\ubcc4 \ube14\ub85d (\uc601\uc0c1\u00b7\ubaa9\uc801\u00b7\uccb4\ud06c \ud3ec\uc778\ud2b8)", "community": 1, "community_name": "\ub178\uc158 DB\u00b7\uc601\uc0c1 \ucc98\ub9ac", "source_file": "CLAUDE.md", "file_type": "concept", "degree": 5}, {"id": "claude_\uc8fc\uac04_\uc810\uac80", "label": "\ud83d\udccb \uc8fc\uac04 \uc810\uac80 (\ub9e4\uc8fc \uc77c\uc694\uc77c)", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "\ud83d\udccb \uc8fc\uac04 \uc810\uac80 (\ub9e4\uc8fc \uc77c\uc694\uc77c)", "community": 1, "community_name": "\ub178\uc158 DB\u00b7\uc601\uc0c1 \ucc98\ub9ac", "source_file": "CLAUDE.md", "file_type": "concept", "degree": 2}, {"id": "claude_\ud68c\uc6d0_\uba85\ub2e8", "label": "\ud83d\udc65 \ud68c\uc6d0 \uba85\ub2e8 (DB)", "color": {"background": "#F28E2B", "border": "#F28E2B", "highlight": {"background": "#ffffff", "border": "#F28E2B"}}, "size": 19.0, "font": {"size": 12, "color": "#ffffff"}, "title": "\ud83d\udc65 \ud68c\uc6d0 \uba85\ub2e8 (DB)", "community": 1, "community_name": "\ub178\uc158 DB\u00b7\uc601\uc0c1 \ucc98\ub9ac", "source_file": "CLAUDE.md", "file_type": "concept", "degree": 3}, {"id": "index_progs", "label": "PROGS (\uc2dc\uae30\ubcc4 \uc6b4\ub3d9 \ud504\ub85c\uadf8\ub7a8 \ub370\uc774\ud130)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 28.0, "font": {"size": 12, "color": "#ffffff"}, "title": "PROGS (\uc2dc\uae30\ubcc4 \uc6b4\ub3d9 \ud504\ub85c\uadf8\ub7a8 \ub370\uc774\ud130)", "community": 10, "community_name": "\uc2dc\uae30\ubcc4 \uc6b4\ub3d9 \ud504\ub85c\uadf8\ub7a8", "source_file": "index.html", "file_type": "code", "degree": 6}, {"id": "index_\uc784\uc2e0_\uc911\uae30_\ud504\ub85c\uadf8\ub7a8", "label": "\uc784\uc2e0 \uc911\uae30 \ud504\ub85c\uadf8\ub7a8 (14\u201327\uc8fc)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "\uc784\uc2e0 \uc911\uae30 \ud504\ub85c\uadf8\ub7a8 (14\u201327\uc8fc)", "community": 10, "community_name": "\uc2dc\uae30\ubcc4 \uc6b4\ub3d9 \ud504\ub85c\uadf8\ub7a8", "source_file": "index.html", "file_type": "concept", "degree": 2}, {"id": "index_\uc784\uc2e0_\ucd08\uae30_\ud504\ub85c\uadf8\ub7a8", "label": "\uc784\uc2e0 \ucd08\uae30 \ud504\ub85c\uadf8\ub7a8 (1\u201313\uc8fc)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "\uc784\uc2e0 \ucd08\uae30 \ud504\ub85c\uadf8\ub7a8 (1\u201313\uc8fc)", "community": 10, "community_name": "\uc2dc\uae30\ubcc4 \uc6b4\ub3d9 \ud504\ub85c\uadf8\ub7a8", "source_file": "index.html", "file_type": "concept", "degree": 1}, {"id": "index_\uc784\uc2e0_\ud6c4\uae30_\ud504\ub85c\uadf8\ub7a8", "label": "\uc784\uc2e0 \ud6c4\uae30 \ud504\ub85c\uadf8\ub7a8 (28\u201340\uc8fc)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 19.0, "font": {"size": 12, "color": "#ffffff"}, "title": "\uc784\uc2e0 \ud6c4\uae30 \ud504\ub85c\uadf8\ub7a8 (28\u201340\uc8fc)", "community": 10, "community_name": "\uc2dc\uae30\ubcc4 \uc6b4\ub3d9 \ud504\ub85c\uadf8\ub7a8", "source_file": "index.html", "file_type": "concept", "degree": 3}, {"id": "index_\ubc14\ub85c_\ub204\uc6b4_\uc790\uc138_\ud68c\ud53c", "label": "16\uc8fc \uc774\ud6c4 \ubc14\ub85c \ub204\uc6b4 \uc790\uc138 \ud68c\ud53c (\ud558\ub300\uc815\ub9e5 \uc555\ubc15)", "color": {"background": "#4E79A7", "border": "#4E79A7", "highlight": {"background": "#ffffff", "border": "#4E79A7"}}, "size": 22.0, "font": {"size": 12, "color": "#ffffff"}, "title": "16\uc8fc \uc774\ud6c4 \ubc14\ub85c \ub204\uc6b4 \uc790\uc138 \ud68c\ud53c (\ud558\ub300\uc815\ub9e5 \uc555\ubc15)", "community": 10, "community_name": "\uc2dc\uae30\ubcc4 \uc6b4\ub3d9 \ud504\ub85c\uadf8\ub7a8", "source_file": "index.html", "file_type": "rationale", "degree": 4}, {"id": "media_s1_forested_hills_sunrise", "label": "Forested Hills at Golden-hour Sunrise", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Forested Hills at Golden-hour Sunrise", "community": 2, "community_name": "s1 \uc804\uc6d0\uc8fc\ud0dd \uc0ac\uc9c4", "source_file": "media/s1.webp", "file_type": "concept", "degree": 1}, {"id": "media_s1_front_porch", "label": "Covered Front Porch", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Covered Front Porch", "community": 2, "community_name": "s1 \uc804\uc6d0\uc8fc\ud0dd \uc0ac\uc9c4", "source_file": "media/s1.webp", "file_type": "concept", "degree": 1}, {"id": "media_s1_garden_landscape", "label": "Garden Landscape (hydrangeas, grasses, lavender)", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Garden Landscape (hydrangeas, grasses, lavender)", "community": 2, "community_name": "s1 \uc804\uc6d0\uc8fc\ud0dd \uc0ac\uc9c4", "source_file": "media/s1.webp", "file_type": "concept", "degree": 1}, {"id": "media_s1_glass_corner_window", "label": "Two-story Glass Window Bay", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Two-story Glass Window Bay", "community": 2, "community_name": "s1 \uc804\uc6d0\uc8fc\ud0dd \uc0ac\uc9c4", "source_file": "media/s1.webp", "file_type": "concept", "degree": 1}, {"id": "media_s1_gravel_driveway", "label": "Gravel Driveway", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Gravel Driveway", "community": 2, "community_name": "s1 \uc804\uc6d0\uc8fc\ud0dd \uc0ac\uc9c4", "source_file": "media/s1.webp", "file_type": "concept", "degree": 1}, {"id": "media_s1_modern_farmhouse", "label": "Modern Farmhouse (two-story, metal roof, wood & stucco)", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 19.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Modern Farmhouse (two-story, metal roof, wood & stucco)", "community": 2, "community_name": "s1 \uc804\uc6d0\uc8fc\ud0dd \uc0ac\uc9c4", "source_file": "media/s1.webp", "file_type": "concept", "degree": 3}, {"id": "media_s1_peaceful_retreat_mood", "label": "Peaceful Rural Retreat Mood (\ub9c8\uc74c \ud3b8\ud55c \ud734\uc2dd \uc774\ubbf8\uc9c0)", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Peaceful Rural Retreat Mood (\ub9c8\uc74c \ud3b8\ud55c \ud734\uc2dd \uc774\ubbf8\uc9c0)", "community": 2, "community_name": "s1 \uc804\uc6d0\uc8fc\ud0dd \uc0ac\uc9c4", "source_file": "media/s1.webp", "file_type": "concept", "degree": 1}, {"id": "media_s1", "label": "s1 - Hillside Farmhouse at Sunrise (aerial photo)", "color": {"background": "#E15759", "border": "#E15759", "highlight": {"background": "#ffffff", "border": "#E15759"}}, "size": 25.0, "font": {"size": 12, "color": "#ffffff"}, "title": "s1 - Hillside Farmhouse at Sunrise (aerial photo)", "community": 2, "community_name": "s1 \uc804\uc6d0\uc8fc\ud0dd \uc0ac\uc9c4", "source_file": "media/s1.webp", "file_type": "image", "degree": 5}, {"id": "media_s4_calm_home_atmosphere", "label": "Calm Sunlit Home Atmosphere", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Calm Sunlit Home Atmosphere", "community": 3, "community_name": "s4 \uc784\uc0b0\ubd80 \uba85\uc0c1 \uc0ac\uc9c4", "source_file": "media/s4.webp", "file_type": "concept", "degree": 2}, {"id": "media_s4_exercise_ball", "label": "Exercise / Birthing Ball", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Exercise / Birthing Ball", "community": 3, "community_name": "s4 \uc784\uc0b0\ubd80 \uba85\uc0c1 \uc0ac\uc9c4", "source_file": "media/s4.webp", "file_type": "concept", "degree": 2}, {"id": "media_s4_meditation_cushion", "label": "Meditation Cushion (Zafu)", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Meditation Cushion (Zafu)", "community": 3, "community_name": "s4 \uc784\uc0b0\ubd80 \uba85\uc0c1 \uc0ac\uc9c4", "source_file": "media/s4.webp", "file_type": "concept", "degree": 1}, {"id": "media_s4_pregnant_woman", "label": "Pregnant Woman (Subject)", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Pregnant Woman (Subject)", "community": 3, "community_name": "s4 \uc784\uc0b0\ubd80 \uba85\uc0c1 \uc0ac\uc9c4", "source_file": "media/s4.webp", "file_type": "concept", "degree": 2}, {"id": "media_s4_prenatal_meditation", "label": "Prenatal Meditation / Mindfulness", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Prenatal Meditation / Mindfulness", "community": 3, "community_name": "s4 \uc784\uc0b0\ubd80 \uba85\uc0c1 \uc0ac\uc9c4", "source_file": "media/s4.webp", "file_type": "concept", "degree": 2}, {"id": "media_s4_prenatal_wellness", "label": "Prenatal Wellness / Back Comfort Theme", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 19.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Prenatal Wellness / Back Comfort Theme", "community": 3, "community_name": "s4 \uc784\uc0b0\ubd80 \uba85\uc0c1 \uc0ac\uc9c4", "source_file": "media/s4.webp", "file_type": "concept", "degree": 3}, {"id": "media_s4_yoga_mat", "label": "Yoga Mat", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Yoga Mat", "community": 3, "community_name": "s4 \uc784\uc0b0\ubd80 \uba85\uc0c1 \uc0ac\uc9c4", "source_file": "media/s4.webp", "file_type": "concept", "degree": 1}, {"id": "media_s4", "label": "s4 \u2014 Prenatal Meditation Lifestyle Photo", "color": {"background": "#76B7B2", "border": "#76B7B2", "highlight": {"background": "#ffffff", "border": "#76B7B2"}}, "size": 25.0, "font": {"size": 12, "color": "#ffffff"}, "title": "s4 \u2014 Prenatal Meditation Lifestyle Photo", "community": 3, "community_name": "s4 \uc784\uc0b0\ubd80 \uba85\uc0c1 \uc0ac\uc9c4", "source_file": "media/s4.webp", "file_type": "image", "degree": 5}, {"id": "media_s2_calm_comfort_mood", "label": "Calm, Comfortable Mood (\ub9c8\uc74c \ud3b8\ud55c \ud734\uc2dd)", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Calm, Comfortable Mood (\ub9c8\uc74c \ud3b8\ud55c \ud734\uc2dd)", "community": 4, "community_name": "s2 \uac70\uc2e4 \uc778\ud14c\ub9ac\uc5b4 \uc0ac\uc9c4", "source_file": "media/s2.webp", "file_type": "concept", "degree": 2}, {"id": "media_s2_houseplants", "label": "Monstera and Fiddle-Leaf Plants", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Monstera and Fiddle-Leaf Plants", "community": 4, "community_name": "s2 \uac70\uc2e4 \uc778\ud14c\ub9ac\uc5b4 \uc0ac\uc9c4", "source_file": "media/s2.webp", "file_type": "concept", "degree": 1}, {"id": "media_s2_living_room_furniture", "label": "Linen Sofa, Rattan Chair, Wooden Coffee Table", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Linen Sofa, Rattan Chair, Wooden Coffee Table", "community": 4, "community_name": "s2 \uac70\uc2e4 \uc778\ud14c\ub9ac\uc5b4 \uc0ac\uc9c4", "source_file": "media/s2.webp", "file_type": "concept", "degree": 1}, {"id": "media_s2_morning_sunlight", "label": "Morning Sunlight Through Sheer Curtains", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Morning Sunlight Through Sheer Curtains", "community": 4, "community_name": "s2 \uac70\uc2e4 \uc778\ud14c\ub9ac\uc5b4 \uc0ac\uc9c4", "source_file": "media/s2.webp", "file_type": "concept", "degree": 2}, {"id": "media_s2_neutral_peach_palette", "label": "Neutral Beige and Peach Color Palette", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Neutral Beige and Peach Color Palette", "community": 4, "community_name": "s2 \uac70\uc2e4 \uc778\ud14c\ub9ac\uc5b4 \uc0ac\uc9c4", "source_file": "media/s2.webp", "file_type": "concept", "degree": 2}, {"id": "media_s2_warm_minimal_interior", "label": "Warm Minimal Interior Style", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Warm Minimal Interior Style", "community": 4, "community_name": "s2 \uac70\uc2e4 \uc778\ud14c\ub9ac\uc5b4 \uc0ac\uc9c4", "source_file": "media/s2.webp", "file_type": "concept", "degree": 2}, {"id": "media_s2", "label": "s2 \u2014 Sunlit Living Room Interior", "color": {"background": "#59A14F", "border": "#59A14F", "highlight": {"background": "#ffffff", "border": "#59A14F"}}, "size": 28.0, "font": {"size": 12, "color": "#ffffff"}, "title": "s2 \u2014 Sunlit Living Room Interior", "community": 4, "community_name": "s2 \uac70\uc2e4 \uc778\ud14c\ub9ac\uc5b4 \uc0ac\uc9c4", "source_file": "media/s2.webp", "file_type": "image", "degree": 6}, {"id": "media_s3_calm_wellness_mood", "label": "Calm Mind-Body Wellness Mood (\ub9c8\uc74c\ud3b8 \ud734\uc2dd \uc774\ubbf8\uc9c0)", "color": {"background": "#EDC948", "border": "#EDC948", "highlight": {"background": "#ffffff", "border": "#EDC948"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Calm Mind-Body Wellness Mood (\ub9c8\uc74c\ud3b8 \ud734\uc2dd \uc774\ubbf8\uc9c0)", "community": 5, "community_name": "s3 \uc694\uac00 \ucf54\ub108 \uc0ac\uc9c4", "source_file": "media/s3.webp", "file_type": "concept", "degree": 2}, {"id": "media_s3_exercise_ball", "label": "Cream Exercise Ball", "color": {"background": "#EDC948", "border": "#EDC948", "highlight": {"background": "#ffffff", "border": "#EDC948"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Cream Exercise Ball", "community": 5, "community_name": "s3 \uc694\uac00 \ucf54\ub108 \uc0ac\uc9c4", "source_file": "media/s3.webp", "file_type": "concept", "degree": 1}, {"id": "media_s3_meditation_cushion", "label": "Meditation Cushion (Zafu)", "color": {"background": "#EDC948", "border": "#EDC948", "highlight": {"background": "#ffffff", "border": "#EDC948"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Meditation Cushion (Zafu)", "community": 5, "community_name": "s3 \uc694\uac00 \ucf54\ub108 \uc0ac\uc9c4", "source_file": "media/s3.webp", "file_type": "concept", "degree": 2}, {"id": "media_s3_monstera_plant", "label": "Potted Monstera Plant", "color": {"background": "#EDC948", "border": "#EDC948", "highlight": {"background": "#ffffff", "border": "#EDC948"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Potted Monstera Plant", "community": 5, "community_name": "s3 \uc694\uac00 \ucf54\ub108 \uc0ac\uc9c4", "source_file": "media/s3.webp", "file_type": "concept", "degree": 1}, {"id": "media_s3_morning_sunlight", "label": "Warm Morning Sunlight Through Sheer Curtains", "color": {"background": "#EDC948", "border": "#EDC948", "highlight": {"background": "#ffffff", "border": "#EDC948"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Warm Morning Sunlight Through Sheer Curtains", "community": 5, "community_name": "s3 \uc694\uac00 \ucf54\ub108 \uc0ac\uc9c4", "source_file": "media/s3.webp", "file_type": "concept", "degree": 2}, {"id": "media_s3_yoga_mat", "label": "Sage Green Yoga Mat (partly rolled)", "color": {"background": "#EDC948", "border": "#EDC948", "highlight": {"background": "#ffffff", "border": "#EDC948"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Sage Green Yoga Mat (partly rolled)", "community": 5, "community_name": "s3 \uc694\uac00 \ucf54\ub108 \uc0ac\uc9c4", "source_file": "media/s3.webp", "file_type": "concept", "degree": 2}, {"id": "media_s3", "label": "s3 \u2014 Sunlit Home Yoga/Meditation Corner Photo", "color": {"background": "#EDC948", "border": "#EDC948", "highlight": {"background": "#ffffff", "border": "#EDC948"}}, "size": 28.0, "font": {"size": 12, "color": "#ffffff"}, "title": "s3 \u2014 Sunlit Home Yoga/Meditation Corner Photo", "community": 5, "community_name": "s3 \uc694\uac00 \ucf54\ub108 \uc0ac\uc9c4", "source_file": "media/s3.webp", "file_type": "image", "degree": 6}, {"id": "index_\ub9d8\ud3b8\ud55c_\ud5c8\ub9ac_\ud504\ub85c\uc81d\ud2b8", "label": "\ub9d8\ud3b8\ud55c \ud5c8\ub9ac \ud504\ub85c\uc81d\ud2b8 (index.html)", "color": {"background": "#B07AA1", "border": "#B07AA1", "highlight": {"background": "#ffffff", "border": "#B07AA1"}}, "size": 25.0, "font": {"size": 12, "color": "#ffffff"}, "title": "\ub9d8\ud3b8\ud55c \ud5c8\ub9ac \ud504\ub85c\uc81d\ud2b8 (index.html)", "community": 6, "community_name": "\ud504\ub85c\uc81d\ud2b8 \uac1c\uc694\u00b7\uac00\uc774\ub4dc\ub77c\uc778", "source_file": "index.html", "file_type": "code", "degree": 5}, {"id": "claude_\ud558\uc774\uc5d4\ub4dc\uc9d0", "label": "\ud558\uc774\uc5d4\ub4dc\uc9d0", "color": {"background": "#B07AA1", "border": "#B07AA1", "highlight": {"background": "#ffffff", "border": "#B07AA1"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "\ud558\uc774\uc5d4\ub4dc\uc9d0", "community": 6, "community_name": "\ud504\ub85c\uc81d\ud2b8 \uac1c\uc694\u00b7\uac00\uc774\ub4dc\ub77c\uc778", "source_file": "CLAUDE.md", "file_type": "concept", "degree": 1}, {"id": "index_one_core_\ud300", "label": "\uc0c1\uba85\ub300 \uc2a4\ud3ec\uce20\uac74\uac15\uad00\ub9ac\uc804\uacf5 ONE CORE", "color": {"background": "#B07AA1", "border": "#B07AA1", "highlight": {"background": "#ffffff", "border": "#B07AA1"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "\uc0c1\uba85\ub300 \uc2a4\ud3ec\uce20\uac74\uac15\uad00\ub9ac\uc804\uacf5 ONE CORE", "community": 6, "community_name": "\ud504\ub85c\uc81d\ud2b8 \uac1c\uc694\u00b7\uac00\uc774\ub4dc\ub77c\uc778", "source_file": "index.html", "file_type": "concept", "degree": 1}, {"id": "claude_\uc218\uc5c5_\uae30\ub85d_\ub178\uc158_\uc5c5\ub85c\ub4dc_\uc9c0\uce68", "label": "\uc218\uc5c5 \uae30\ub85d \ub178\uc158 \uc5c5\ub85c\ub4dc \uc9c0\uce68", "color": {"background": "#B07AA1", "border": "#B07AA1", "highlight": {"background": "#ffffff", "border": "#B07AA1"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "\uc218\uc5c5 \uae30\ub85d \ub178\uc158 \uc5c5\ub85c\ub4dc \uc9c0\uce68", "community": 6, "community_name": "\ud504\ub85c\uc81d\ud2b8 \uac1c\uc694\u00b7\uac00\uc774\ub4dc\ub77c\uc778", "source_file": "CLAUDE.md", "file_type": "document", "degree": 2}, {"id": "index_acog_2020", "label": "ACOG Committee Opinion No. 804 (2020)", "color": {"background": "#B07AA1", "border": "#B07AA1", "highlight": {"background": "#ffffff", "border": "#B07AA1"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "ACOG Committee Opinion No. 804 (2020)", "community": 6, "community_name": "\ud504\ub85c\uc81d\ud2b8 \uac1c\uc694\u00b7\uac00\uc774\ub4dc\ub77c\uc778", "source_file": "index.html", "file_type": "paper", "degree": 2}, {"id": "index_davenport_2019", "label": "Davenport et al. 2019 Canadian guideline", "color": {"background": "#B07AA1", "border": "#B07AA1", "highlight": {"background": "#ffffff", "border": "#B07AA1"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Davenport et al. 2019 Canadian guideline", "community": 6, "community_name": "\ud504\ub85c\uc81d\ud2b8 \uac1c\uc694\u00b7\uac00\uc774\ub4dc\ub77c\uc778", "source_file": "index.html", "file_type": "paper", "degree": 1}, {"id": "index_factors", "label": "FACTORS (\uc694\ud1b5 \uc720\ubc1c \uc5ec\uc12f \uc694\uc778)", "color": {"background": "#FF9DA7", "border": "#FF9DA7", "highlight": {"background": "#ffffff", "border": "#FF9DA7"}}, "size": 19.0, "font": {"size": 12, "color": "#ffffff"}, "title": "FACTORS (\uc694\ud1b5 \uc720\ubc1c \uc5ec\uc12f \uc694\uc778)", "community": 7, "community_name": "\uc694\ud1b5 \uc6d0\uc778\u00b7\uadfc\uac70 \ub17c\ubb38", "source_file": "index.html", "file_type": "code", "degree": 3}, {"id": "index_pages", "label": "PAGES (\uc6d0\uc778\u00b7\uc99d\uc0c1\u00b7\uace0\ub824\uc0ac\ud56d \uc138\ubd80 \ud654\uba74)", "color": {"background": "#FF9DA7", "border": "#FF9DA7", "highlight": {"background": "#ffffff", "border": "#FF9DA7"}}, "size": 25.0, "font": {"size": 12, "color": "#ffffff"}, "title": "PAGES (\uc6d0\uc778\u00b7\uc99d\uc0c1\u00b7\uace0\ub824\uc0ac\ud56d \uc138\ubd80 \ud654\uba74)", "community": 7, "community_name": "\uc694\ud1b5 \uc6d0\uc778\u00b7\uadfc\uac70 \ub17c\ubb38", "source_file": "index.html", "file_type": "code", "degree": 5}, {"id": "index_aldabe_2012", "label": "Aldabe et al. 2012 (relaxin & PGP)", "color": {"background": "#FF9DA7", "border": "#FF9DA7", "highlight": {"background": "#ffffff", "border": "#FF9DA7"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Aldabe et al. 2012 (relaxin & PGP)", "community": 7, "community_name": "\uc694\ud1b5 \uc6d0\uc778\u00b7\uadfc\uac70 \ub17c\ubb38", "source_file": "index.html", "file_type": "paper", "degree": 1}, {"id": "index_bmc_2023_meta", "label": "Global prevalence of LBP in pregnancy meta-analysis (BMC 2023)", "color": {"background": "#FF9DA7", "border": "#FF9DA7", "highlight": {"background": "#ffffff", "border": "#FF9DA7"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "Global prevalence of LBP in pregnancy meta-analysis (BMC 2023)", "community": 7, "community_name": "\uc694\ud1b5 \uc6d0\uc778\u00b7\uadfc\uac70 \ub17c\ubb38", "source_file": "index.html", "file_type": "paper", "degree": 2}, {"id": "index_gutke_2008", "label": "Gutke et al. 2008 (muscle function)", "color": {"background": "#FF9DA7", "border": "#FF9DA7", "highlight": {"background": "#ffffff", "border": "#FF9DA7"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Gutke et al. 2008 (muscle function)", "community": 7, "community_name": "\uc694\ud1b5 \uc6d0\uc778\u00b7\uadfc\uac70 \ub17c\ubb38", "source_file": "index.html", "file_type": "paper", "degree": 1}, {"id": "index_homehtml", "label": "homeHTML()", "color": {"background": "#9C755F", "border": "#9C755F", "highlight": {"background": "#ffffff", "border": "#9C755F"}}, "size": 28.0, "font": {"size": 12, "color": "#ffffff"}, "title": "homeHTML()", "community": 8, "community_name": "\ud654\uba74 \ub80c\ub354\ub9c1\u00b7\uc911\ub2e8 \uc2e0\ud638", "source_file": "index.html", "file_type": "code", "degree": 6}, {"id": "index_proghtml", "label": "progHTML()", "color": {"background": "#9C755F", "border": "#9C755F", "highlight": {"background": "#ffffff", "border": "#9C755F"}}, "size": 22.0, "font": {"size": 12, "color": "#ffffff"}, "title": "progHTML()", "community": 8, "community_name": "\ud654\uba74 \ub80c\ub354\ub9c1\u00b7\uc911\ub2e8 \uc2e0\ud638", "source_file": "index.html", "file_type": "code", "degree": 4}, {"id": "index_stop", "label": "STOP (\uc6b4\ub3d9 \uc911\ub2e8 \uc2e0\ud638)", "color": {"background": "#9C755F", "border": "#9C755F", "highlight": {"background": "#ffffff", "border": "#9C755F"}}, "size": 19.0, "font": {"size": 12, "color": "#ffffff"}, "title": "STOP (\uc6b4\ub3d9 \uc911\ub2e8 \uc2e0\ud638)", "community": 8, "community_name": "\ud654\uba74 \ub80c\ub354\ub9c1\u00b7\uc911\ub2e8 \uc2e0\ud638", "source_file": "index.html", "file_type": "code", "degree": 3}, {"id": "index_breath_widget", "label": "\ud638\ud761 \ub530\ub77c\ud558\uae30 \uc704\uc82f (4\ucd08 \ub4e4\uc228\u00b76\ucd08 \ub0a0\uc228)", "color": {"background": "#9C755F", "border": "#9C755F", "highlight": {"background": "#ffffff", "border": "#9C755F"}}, "size": 16.0, "font": {"size": 12, "color": "#ffffff"}, "title": "\ud638\ud761 \ub530\ub77c\ud558\uae30 \uc704\uc82f (4\ucd08 \ub4e4\uc228\u00b76\ucd08 \ub0a0\uc228)", "community": 8, "community_name": "\ud654\uba74 \ub80c\ub354\ub9c1\u00b7\uc911\ub2e8 \uc2e0\ud638", "source_file": "index.html", "file_type": "concept", "degree": 2}, {"id": "index_stafne_2012", "label": "Stafne et al. 2012 RCT", "color": {"background": "#9C755F", "border": "#9C755F", "highlight": {"background": "#ffffff", "border": "#9C755F"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "Stafne et al. 2012 RCT", "community": 8, "community_name": "\ud654\uba74 \ub80c\ub354\ub9c1\u00b7\uc911\ub2e8 \uc2e0\ud638", "source_file": "index.html", "file_type": "paper", "degree": 1}, {"id": "index_cine", "label": "cine() \uc2dc\ub124\ub9c8\ud2f1 \uc2a4\ud06c\ub864 \uc778\ud2b8\ub85c", "color": {"background": "#BAB0AC", "border": "#BAB0AC", "highlight": {"background": "#ffffff", "border": "#BAB0AC"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "cine() \uc2dc\ub124\ub9c8\ud2f1 \uc2a4\ud06c\ub864 \uc778\ud2b8\ub85c", "community": 9, "community_name": "\ub77c\uc6b0\ud305\u00b7\uc778\ud130\ub799\uc158 \ud568\uc218", "source_file": "index.html", "file_type": "code", "degree": 1}, {"id": "index_countup", "label": "countUp() \ud1b5\uacc4 \uc22b\uc790 \uc560\ub2c8\uba54\uc774\uc158", "color": {"background": "#BAB0AC", "border": "#BAB0AC", "highlight": {"background": "#ffffff", "border": "#BAB0AC"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "countUp() \ud1b5\uacc4 \uc22b\uc790 \uc560\ub2c8\uba54\uc774\uc158", "community": 9, "community_name": "\ub77c\uc6b0\ud305\u00b7\uc778\ud130\ub799\uc158 \ud568\uc218", "source_file": "index.html", "file_type": "code", "degree": 1}, {"id": "index_setweek", "label": "setWeek() \uc8fc\uc218 \ucc3e\uae30", "color": {"background": "#BAB0AC", "border": "#BAB0AC", "highlight": {"background": "#ffffff", "border": "#BAB0AC"}}, "size": 19.0, "font": {"size": 12, "color": "#ffffff"}, "title": "setWeek() \uc8fc\uc218 \ucc3e\uae30", "community": 9, "community_name": "\ub77c\uc6b0\ud305\u00b7\uc778\ud130\ub799\uc158 \ud568\uc218", "source_file": "index.html", "file_type": "code", "degree": 3}, {"id": "index_show", "label": "show() \ud574\uc2dc \ub77c\uc6b0\ud130", "color": {"background": "#BAB0AC", "border": "#BAB0AC", "highlight": {"background": "#ffffff", "border": "#BAB0AC"}}, "size": 31.0, "font": {"size": 12, "color": "#ffffff"}, "title": "show() \ud574\uc2dc \ub77c\uc6b0\ud130", "community": 9, "community_name": "\ub77c\uc6b0\ud305\u00b7\uc778\ud130\ub799\uc158 \ud568\uc218", "source_file": "index.html", "file_type": "code", "degree": 7}, {"id": "index_triof", "label": "triOf() \uc8fc\uc218\u2192\uc2dc\uae30 \ub9e4\ud551", "color": {"background": "#BAB0AC", "border": "#BAB0AC", "highlight": {"background": "#ffffff", "border": "#BAB0AC"}}, "size": 13.0, "font": {"size": 0, "color": "#ffffff"}, "title": "triOf() \uc8fc\uc218\u2192\uc2dc\uae30 \ub9e4\ud551", "community": 9, "community_name": "\ub77c\uc6b0\ud305\u00b7\uc778\ud130\ub799\uc158 \ud568\uc218", "source_file": "index.html", "file_type": "code", "degree": 1}];
+const RAW_EDGES = [{"from": "claude_10\ud68c_\uc9c4\ucc99_\ub9ac\ud3ec\ud2b8", "to": "claude_\uc218\uc5c5_\ud398\uc774\uc9c0", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\uc9c0\ub09c_\uc218\uc5c5\uacfc_\ube44\uad50", "to": "claude_10\ud68c_\uc9c4\ucc99_\ub9ac\ud3ec\ud2b8", "label": "semantically_similar_to", "title": "semantically_similar_to [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "claude_\uc624\ub298\uc758_\uc218\uc5c5_\uc900\ube44", "to": "claude_\uad6c\uae00_\uce98\ub9b0\ub354", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\uc218\uc5c5_\ud398\uc774\uc9c0", "to": "claude_\ub178\uc158_\ud68c\uc6d0\uad00\ub9ac", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\ubd80\uc704\ubcc4_\uc6b4\ub3d9_\ubaa8\uc74c", "to": "claude_\uc218\uc5c5_\ud398\uc774\uc9c0", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\ube60\ub978_\uba54\ubaa8\ud568", "to": "claude_\uc218\uc5c5_\ud398\uc774\uc9c0", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\uc624\ub298\uc758_\uc218\uc5c5_\uc900\ube44", "to": "claude_\ube60\ub978_\uba54\ubaa8\ud568", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\uae00\uc4f0\uae30_\uaddc\uce59", "to": "claude_\uc218\uc5c5_\ud398\uc774\uc9c0", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\uc218\uc5c5_\ud398\uc774\uc9c0", "to": "claude_\uc9c0\ub09c_\uc218\uc5c5\uacfc_\ube44\uad50", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\uc218\uc5c5_\ud398\uc774\uc9c0", "to": "claude_\ud1b5\uc99d_\uae30\ub85d", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\uc218\uc5c5_\ud398\uc774\uc9c0", "to": "claude_\uc6b4\ub3d9\ubcc4_\ube14\ub85d", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\uce74\ud1a1_\uc694\uc57d_\uba54\uc2dc\uc9c0", "to": "claude_\uc218\uc5c5_\ud398\uc774\uc9c0", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\uc218\uc5c5_\ud398\uc774\uc9c0", "to": "claude_\uc218\uc5c5_\uae30\ub85d_db", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\uc601\uc0c1_\uc5c5\ub85c\ub4dc_\ubc29\ubc95", "to": "claude_ffmpeg", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\uc601\uc0c1_\uc74c\uc131_\ubc1b\uc544\uc4f0\uae30", "to": "claude_ffmpeg", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\uc6b4\ub3d9\ubcc4_\ube14\ub85d", "to": "claude_\uc0c1\ub2f4_\ub0b4\uc6a9", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\ud68c\uc6d0_\uba85\ub2e8", "to": "claude_\uc0c1\ub2f4_\ub0b4\uc6a9", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\uc8fc\uac04_\uc810\uac80", "to": "claude_\uc218\uc5c5_\uae30\ub85d_db", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\ud68c\uc6d0_\uba85\ub2e8", "to": "claude_\uc218\uc5c5_\uae30\ub85d_db", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\uc601\uc0c1_\uc5c5\ub85c\ub4dc_\ubc29\ubc95", "to": "claude_\uc6b4\ub3d9\ubcc4_\ube14\ub85d", "label": "implements", "title": "implements [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\uc601\uc0c1_\uc74c\uc131_\ubc1b\uc544\uc4f0\uae30", "to": "claude_\uc6b4\ub3d9\ubcc4_\ube14\ub85d", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\uc6b4\ub3d9\ubcc4_\ube14\ub85d", "to": "index_proghtml", "label": "semantically_similar_to", "title": "semantically_similar_to [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "claude_\uc8fc\uac04_\uc810\uac80", "to": "claude_\ud68c\uc6d0_\uba85\ub2e8", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_progs", "to": "index_\uc784\uc2e0_\ucd08\uae30_\ud504\ub85c\uadf8\ub7a8", "label": "implements", "title": "implements [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_progs", "to": "index_\uc784\uc2e0_\uc911\uae30_\ud504\ub85c\uadf8\ub7a8", "label": "implements", "title": "implements [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_progs", "to": "index_\uc784\uc2e0_\ud6c4\uae30_\ud504\ub85c\uadf8\ub7a8", "label": "implements", "title": "implements [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_homehtml", "to": "index_progs", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_proghtml", "to": "index_progs", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_setweek", "to": "index_progs", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_\ubc14\ub85c_\ub204\uc6b4_\uc790\uc138_\ud68c\ud53c", "to": "index_\uc784\uc2e0_\uc911\uae30_\ud504\ub85c\uadf8\ub7a8", "label": "rationale_for", "title": "rationale_for [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_breath_widget", "to": "index_\uc784\uc2e0_\ud6c4\uae30_\ud504\ub85c\uadf8\ub7a8", "label": "semantically_similar_to", "title": "semantically_similar_to [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "index_\ubc14\ub85c_\ub204\uc6b4_\uc790\uc138_\ud68c\ud53c", "to": "index_\uc784\uc2e0_\ud6c4\uae30_\ud504\ub85c\uadf8\ub7a8", "label": "rationale_for", "title": "rationale_for [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "index_pages", "to": "index_\ubc14\ub85c_\ub204\uc6b4_\uc790\uc138_\ud68c\ud53c", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_acog_2020", "to": "index_\ubc14\ub85c_\ub204\uc6b4_\uc790\uc138_\ud68c\ud53c", "label": "rationale_for", "title": "rationale_for [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "media_s1", "to": "media_s1_forested_hills_sunrise", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s1_modern_farmhouse", "to": "media_s1_front_porch", "label": "conceptually_related_to", "title": "conceptually_related_to [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s1", "to": "media_s1_garden_landscape", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s1_modern_farmhouse", "to": "media_s1_glass_corner_window", "label": "conceptually_related_to", "title": "conceptually_related_to [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s1", "to": "media_s1_gravel_driveway", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s1", "to": "media_s1_modern_farmhouse", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s1", "to": "media_s1_peaceful_retreat_mood", "label": "conceptually_related_to", "title": "conceptually_related_to [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "media_s4", "to": "media_s4_calm_home_atmosphere", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s4_calm_home_atmosphere", "to": "media_s4_prenatal_wellness", "label": "rationale_for", "title": "rationale_for [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "media_s4_exercise_ball", "to": "media_s4_prenatal_wellness", "label": "conceptually_related_to", "title": "conceptually_related_to [AMBIGUOUS]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "AMBIGUOUS"}, {"from": "media_s4", "to": "media_s4_exercise_ball", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s4", "to": "media_s4_meditation_cushion", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s4_pregnant_woman", "to": "media_s4_prenatal_meditation", "label": "implements", "title": "implements [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s4", "to": "media_s4_pregnant_woman", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s4_prenatal_meditation", "to": "media_s4_prenatal_wellness", "label": "conceptually_related_to", "title": "conceptually_related_to [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "media_s4", "to": "media_s4_yoga_mat", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s2", "to": "media_s2_calm_comfort_mood", "label": "conceptually_related_to", "title": "conceptually_related_to [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "media_s2_morning_sunlight", "to": "media_s2_calm_comfort_mood", "label": "rationale_for", "title": "rationale_for [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "media_s2", "to": "media_s2_houseplants", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s2", "to": "media_s2_living_room_furniture", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s2", "to": "media_s2_morning_sunlight", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s2", "to": "media_s2_neutral_peach_palette", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s2_neutral_peach_palette", "to": "media_s2_warm_minimal_interior", "label": "conceptually_related_to", "title": "conceptually_related_to [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "media_s2", "to": "media_s2_warm_minimal_interior", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s3_morning_sunlight", "to": "media_s3_calm_wellness_mood", "label": "rationale_for", "title": "rationale_for [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "media_s3", "to": "media_s3_calm_wellness_mood", "label": "conceptually_related_to", "title": "conceptually_related_to [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "media_s3", "to": "media_s3_exercise_ball", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s3", "to": "media_s3_meditation_cushion", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s3_meditation_cushion", "to": "media_s3_yoga_mat", "label": "conceptually_related_to", "title": "conceptually_related_to [INFERRED]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "INFERRED"}, {"from": "media_s3", "to": "media_s3_monstera_plant", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s3", "to": "media_s3_morning_sunlight", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "media_s3", "to": "media_s3_yoga_mat", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\uc218\uc5c5_\uae30\ub85d_\ub178\uc158_\uc5c5\ub85c\ub4dc_\uc9c0\uce68", "to": "index_\ub9d8\ud3b8\ud55c_\ud5c8\ub9ac_\ud504\ub85c\uc81d\ud2b8", "label": "conceptually_related_to", "title": "conceptually_related_to [AMBIGUOUS]", "dashes": true, "width": 1, "color": {"opacity": 0.35}, "confidence": "AMBIGUOUS"}, {"from": "index_\ub9d8\ud3b8\ud55c_\ud5c8\ub9ac_\ud504\ub85c\uc81d\ud2b8", "to": "index_show", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_\ub9d8\ud3b8\ud55c_\ud5c8\ub9ac_\ud504\ub85c\uc81d\ud2b8", "to": "index_acog_2020", "label": "cites", "title": "cites [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_\ub9d8\ud3b8\ud55c_\ud5c8\ub9ac_\ud504\ub85c\uc81d\ud2b8", "to": "index_davenport_2019", "label": "cites", "title": "cites [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_\ub9d8\ud3b8\ud55c_\ud5c8\ub9ac_\ud504\ub85c\uc81d\ud2b8", "to": "index_one_core_\ud300", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "claude_\uc218\uc5c5_\uae30\ub85d_\ub178\uc158_\uc5c5\ub85c\ub4dc_\uc9c0\uce68", "to": "claude_\ud558\uc774\uc5d4\ub4dc\uc9d0", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_factors", "to": "index_aldabe_2012", "label": "cites", "title": "cites [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_factors", "to": "index_gutke_2008", "label": "cites", "title": "cites [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_pages", "to": "index_factors", "label": "shares_data_with", "title": "shares_data_with [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_show", "to": "index_pages", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_pages", "to": "index_bmc_2023_meta", "label": "cites", "title": "cites [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_pages", "to": "index_stop", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_homehtml", "to": "index_bmc_2023_meta", "label": "cites", "title": "cites [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_show", "to": "index_homehtml", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_homehtml", "to": "index_stafne_2012", "label": "cites", "title": "cites [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_homehtml", "to": "index_breath_widget", "label": "implements", "title": "implements [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_homehtml", "to": "index_stop", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_show", "to": "index_proghtml", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_proghtml", "to": "index_stop", "label": "references", "title": "references [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_show", "to": "index_cine", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_show", "to": "index_countup", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_setweek", "to": "index_triof", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}, {"from": "index_show", "to": "index_setweek", "label": "calls", "title": "calls [EXTRACTED]", "dashes": false, "width": 2, "color": {"opacity": 0.7}, "confidence": "EXTRACTED"}];
+const LEGEND = [{"cid": 0, "color": "#4E79A7", "label": "\uc218\uc5c5 \ud398\uc774\uc9c0 \uc791\uc131 \uaddc\uce59", "count": 11}, {"cid": 1, "color": "#F28E2B", "label": "\ub178\uc158 DB\u00b7\uc601\uc0c1 \ucc98\ub9ac", "count": 8}, {"cid": 2, "color": "#E15759", "label": "s1 \uc804\uc6d0\uc8fc\ud0dd \uc0ac\uc9c4", "count": 8}, {"cid": 3, "color": "#76B7B2", "label": "s4 \uc784\uc0b0\ubd80 \uba85\uc0c1 \uc0ac\uc9c4", "count": 8}, {"cid": 4, "color": "#59A14F", "label": "s2 \uac70\uc2e4 \uc778\ud14c\ub9ac\uc5b4 \uc0ac\uc9c4", "count": 7}, {"cid": 5, "color": "#EDC948", "label": "s3 \uc694\uac00 \ucf54\ub108 \uc0ac\uc9c4", "count": 7}, {"cid": 6, "color": "#B07AA1", "label": "\ud504\ub85c\uc81d\ud2b8 \uac1c\uc694\u00b7\uac00\uc774\ub4dc\ub77c\uc778", "count": 6}, {"cid": 7, "color": "#FF9DA7", "label": "\uc694\ud1b5 \uc6d0\uc778\u00b7\uadfc\uac70 \ub17c\ubb38", "count": 5}, {"cid": 8, "color": "#9C755F", "label": "\ud654\uba74 \ub80c\ub354\ub9c1\u00b7\uc911\ub2e8 \uc2e0\ud638", "count": 5}, {"cid": 9, "color": "#BAB0AC", "label": "\ub77c\uc6b0\ud305\u00b7\uc778\ud130\ub799\uc158 \ud568\uc218", "count": 5}, {"cid": 10, "color": "#4E79A7", "label": "\uc2dc\uae30\ubcc4 \uc6b4\ub3d9 \ud504\ub85c\uadf8\ub7a8", "count": 5}];
+
+// HTML-escape helper — prevents XSS when injecting graph data into innerHTML
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// Build vis datasets
+const nodesDS = new vis.DataSet(RAW_NODES.map((n, i) => ({
+  id: n.id, label: n.label, color: n.color, size: n.size,
+  font: n.font, title: n.title,
+  // Fermat/golden-angle spiral seed positions (#3699): spreading nodes out
+  // before physics runs keeps avoidOverlap from computing near-zero-distance
+  // repulsion that blows the BarnesHut recursion into a stack overflow on large
+  // graphs. `i` is the map index — physics still settles small graphs identically.
+  x: 30 * Math.sqrt(i) * Math.cos(i * 2.4),
+  y: 30 * Math.sqrt(i) * Math.sin(i * 2.4),
+  community: n.community, community_name: n.community_name,
+  source_file: n.source_file, file_type: n.file_type, degree: n.degree,
+  member_count: n.member_count,
+})));
+
+const edgesDS = new vis.DataSet(RAW_EDGES.map((e, i) => ({
+  id: i, from: e.from, to: e.to,
+  label: '',
+  title: e.title,
+  dashes: e.dashes,
+  width: e.width,
+  color: e.color,
+  arrows: { to: { enabled: true, scaleFactor: 0.5 } },
+})));
+
+const container = document.getElementById('graph');
+const network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, {
+  physics: {
+    enabled: true,
+    solver: 'forceAtlas2Based',
+    forceAtlas2Based: {
+      gravitationalConstant: -60,
+      centralGravity: 0.005,
+      springLength: 120,
+      springConstant: 0.08,
+      damping: 0.4,
+      avoidOverlap: 0.8,
+    },
+    stabilization: { iterations: 200, fit: true },
+  },
+  interaction: {
+    hover: true,
+    tooltipDelay: 100,
+    hideEdgesOnDrag: true,
+    navigationButtons: false,
+    keyboard: false,
+  },
+  nodes: { shape: 'dot', borderWidth: 1.5 },
+  edges: { smooth: { type: 'continuous', roundness: 0.2 }, selectionWidth: 3 },
+});
+
+// Theme toggle (#3894): Light / Dark / System, persisted in localStorage.
+const THEME_KEY = 'graphify-theme';
+const themeMQ = window.matchMedia ? window.matchMedia('(prefers-color-scheme: light)') : null;
+let themeLabelColor = '#ffffff';  // matches the per-node font color set in Python
+function themePref() {
+  let p = null;
+  try { p = localStorage.getItem(THEME_KEY); } catch (e) {}
+  return (p === 'light' || p === 'dark' || p === 'system') ? p : null;
+}
+function applyTheme(pref) {
+  const t = pref === 'light' ? 'light' : (pref === 'system' && themeMQ && themeMQ.matches) ? 'light' : 'dark';
+  const root = document.documentElement;
+  if (!root) return;
+  root.setAttribute('data-theme', t);
+  document.querySelectorAll('[data-theme-choice]').forEach(b => {
+    b.setAttribute('aria-pressed', String(b.dataset.themeChoice === (pref || 'dark')));
+  });
+  const labelColor = getComputedStyle(root).getPropertyValue('--node-label').trim();
+  if (labelColor && labelColor !== themeLabelColor) {
+    themeLabelColor = labelColor;
+    nodesDS.update(nodesDS.get().map(n => ({ id: n.id, font: Object.assign({}, n.font, { color: labelColor }) })));
+  }
+}
+document.querySelectorAll('[data-theme-choice]').forEach(b => {
+  b.addEventListener('click', () => {
+    const pref = b.dataset.themeChoice;
+    try { localStorage.setItem(THEME_KEY, pref); } catch (e) {}
+    applyTheme(pref);
+  });
+});
+if (themeMQ) {
+  const onSchemeChange = () => { if (themePref() === 'system') applyTheme('system'); };
+  if (themeMQ.addEventListener) themeMQ.addEventListener('change', onSchemeChange);
+  else if (themeMQ.addListener) themeMQ.addListener(onSchemeChange);
+}
+applyTheme(themePref());
+
+network.once('stabilizationIterationsDone', () => {
+  network.setOptions({ physics: { enabled: false } });
+});
+
+function showInfo(nodeId) {
+  const n = nodesDS.get(nodeId);
+  if (!n) return;
+  const neighborIds = network.getConnectedNodes(nodeId);
+  const neighborItems = neighborIds.map(nid => {
+    const nb = nodesDS.get(nid);
+    const color = nb ? nb.color.background : '#555';
+    return `<span class="neighbor-link" style="border-left-color:${esc(color)}" data-nid="${esc(nid)}">${esc(nb ? nb.label : nid)}</span>`;
+  }).join('');
+  const isMetaNode = !n.file_type && !n.source_file;
+  let html = `<div class="field"><b>${esc(n.label)}</b></div>`;
+  if (!isMetaNode) {
+    html += `<div class="field">Type: ${esc(n.file_type || 'unknown')}</div>`;
+  }
+  html += `<div class="field">Community: ${esc(n.community_name || '')}</div>`;
+  if (!isMetaNode) {
+    html += `<div class="field">Source: ${esc(n.source_file || '-')}</div>`;
+  } else if (n.member_count !== undefined && n.member_count !== null) {
+    html += `<div class="field">Members: ${esc(n.member_count)}</div>`;
+  }
+  html += `<div class="field">Degree: ${n.degree}</div>`;
+  if (neighborIds.length) {
+    html += `<div class="field" style="margin-top:8px;color:var(--text-2);font-size:11px">Neighbors (${neighborIds.length})</div><div id="neighbors-list">${neighborItems}</div>`;
+  }
+  document.getElementById('info-content').innerHTML = html;
+}
+
+function focusNode(nodeId) {
+  network.focus(nodeId, { scale: 1.4, animation: true });
+  network.selectNodes([nodeId]);
+  showInfo(nodeId);
+}
+
+// Neighbor links use a data attribute + one delegated listener rather than an
+// inline onclick. A node id/label sourced from a document or a scraped URL
+// (graphify add) can contain a double-quote; dropping the stringified id
+// unescaped into a quoted onclick both broke every link and allowed a hostile
+// source to inject an event handler into the local report (stored XSS, #1838).
+// esc() on data-nid keeps the value inside the attribute; the listener reads it
+// back verbatim. Bound to document so it survives the innerHTML rebuild that
+// recreates #neighbors-list on each showInfo().
+document.addEventListener('click', e => {
+  const el = e.target.closest('.neighbor-link');
+  if (el && el.dataset.nid !== undefined) focusNode(el.dataset.nid);
+});
+
+// Sidebar tooltips reuse vis-network's .vis-tooltip style and 100ms tooltipDelay.
+// Names get one only when CSS ellipsis truncates them (the full text is still in
+// the DOM); counts always get one, to say what the number is. Text is set with
+// textContent only (labels are untrusted). Delegated on document so rows rebuilt
+// later (search results, showInfo()) are covered.
+const sidebarTip = document.createElement('div');
+sidebarTip.className = 'vis-tooltip';
+sidebarTip.style.cssText = 'white-space: normal; max-width: 360px; overflow-wrap: break-word;';
+document.body.appendChild(sidebarTip);
+let sidebarTipTimer = null;
+let sidebarTipEl = null;    // element whose text the tooltip shows
+let sidebarTipZone = null;  // element the pointer must leave to hide it
+function hideSidebarTip() {
+  clearTimeout(sidebarTipTimer);
+  sidebarTip.style.visibility = 'hidden';
+  sidebarTip.textContent = '';
+  sidebarTipEl = sidebarTipZone = null;
+}
+document.addEventListener('mouseover', e => {
+  const zone = e.target.closest && e.target.closest('.legend-count, .legend-item, .search-item, .neighbor-link');
+  // Anywhere on a legend row except its count (dot, checkbox, gaps, padding)
+  // stands for the row's name, so moving within the row never re-triggers it.
+  const el = zone && zone.classList.contains('legend-item') ? zone.querySelector('.legend-label') : zone;
+  if (!el || el === sidebarTipEl) return;
+  hideSidebarTip();
+  const isCount = el.classList.contains('legend-count');
+  if (!isCount && el.scrollWidth <= el.clientWidth) return;
+  const text = isCount ? `${el.textContent} ${el.textContent === '1' ? 'node' : 'nodes'}` : el.textContent;
+  sidebarTipEl = el;
+  sidebarTipZone = zone;
+  const x = e.clientX, y = e.clientY;
+  sidebarTipTimer = setTimeout(() => {
+    sidebarTip.textContent = text;
+    sidebarTip.style.left = sidebarTip.style.top = '0px';  // measure at full max-width
+    sidebarTip.style.visibility = 'visible';
+    const w = sidebarTip.offsetWidth, h = sidebarTip.offsetHeight;
+    sidebarTip.style.left = Math.max(4, Math.min(x + 12, window.innerWidth - w - 4)) + 'px';
+    sidebarTip.style.top = (y + 16 + h > window.innerHeight ? Math.max(4, y - h - 8) : y + 16) + 'px';
+  }, 100);
+});
+document.addEventListener('mouseout', e => {
+  if (sidebarTipZone && !sidebarTipZone.contains(e.relatedTarget)) hideSidebarTip();
+});
+// A click rebuilds or hides the row (showInfo(), search pick) without a mouseout.
+document.addEventListener('mousedown', hideSidebarTip);
+
+// Track hovered node — hover detection is more reliable than click params
+let hoveredNodeId = null;
+network.on('hoverNode', params => {
+  hoveredNodeId = params.node;
+  container.style.cursor = 'pointer';
+});
+network.on('blurNode', () => {
+  hoveredNodeId = null;
+  container.style.cursor = 'default';
+});
+container.addEventListener('click', () => {
+  if (hoveredNodeId !== null) {
+    showInfo(hoveredNodeId);
+    network.selectNodes([hoveredNodeId]);
+  }
+});
+network.on('click', params => {
+  if (params.nodes.length > 0) {
+    showInfo(params.nodes[0]);
+  } else if (hoveredNodeId === null) {
+    document.getElementById('info-content').innerHTML = '<span class="empty">Click a node to inspect it</span>';
+  }
+});
+
+const searchInput = document.getElementById('search');
+const searchResults = document.getElementById('search-results');
+searchInput.addEventListener('input', () => {
+  const q = searchInput.value.toLowerCase().trim();
+  searchResults.innerHTML = '';
+  if (!q) { searchResults.style.display = 'none'; return; }
+  const matches = RAW_NODES.filter(n => n.label.toLowerCase().includes(q)).slice(0, 20);
+  if (!matches.length) { searchResults.style.display = 'none'; return; }
+  searchResults.style.display = 'block';
+  matches.forEach(n => {
+    const el = document.createElement('div');
+    el.className = 'search-item';
+    el.textContent = n.label;
+    el.style.borderLeft = `3px solid ${n.color.background}`;
+    el.style.paddingLeft = '8px';
+    el.onclick = () => {
+      network.focus(n.id, { scale: 1.5, animation: true });
+      network.selectNodes([n.id]);
+      showInfo(n.id);
+      searchResults.style.display = 'none';
+      searchInput.value = '';
+    };
+    searchResults.appendChild(el);
+  });
+});
+document.addEventListener('click', e => {
+  if (!searchResults.contains(e.target) && e.target !== searchInput)
+    searchResults.style.display = 'none';
+});
+
+const hiddenCommunities = new Set();
+
+const selectAllCb = document.getElementById('select-all-cb');
+
+function updateSelectAllState() {
+  const total = LEGEND.length;
+  const hidden = hiddenCommunities.size;
+  selectAllCb.checked = hidden === 0;
+  selectAllCb.indeterminate = hidden > 0 && hidden < total;
+}
+
+function toggleAllCommunities(hide) {
+  document.querySelectorAll('.legend-item').forEach(item => {
+    hide ? item.classList.add('dimmed') : item.classList.remove('dimmed');
+  });
+  document.querySelectorAll('.legend-cb').forEach(cb => {
+    cb.checked = !hide;
+  });
+  LEGEND.forEach(c => {
+    if (hide) hiddenCommunities.add(c.cid); else hiddenCommunities.delete(c.cid);
+  });
+  const updates = RAW_NODES.map(n => ({ id: n.id, hidden: hide }));
+  nodesDS.update(updates);
+  updateSelectAllState();
+}
+
+const legendEl = document.getElementById('legend');
+LEGEND.forEach(c => {
+  const item = document.createElement('div');
+  item.className = 'legend-item';
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.className = 'legend-cb';
+  cb.checked = true;
+  cb.addEventListener('change', (e) => {
+    e.stopPropagation();
+    if (cb.checked) {
+      hiddenCommunities.delete(c.cid);
+      item.classList.remove('dimmed');
+    } else {
+      hiddenCommunities.add(c.cid);
+      item.classList.add('dimmed');
+    }
+    const updates = RAW_NODES
+      .filter(n => n.community === c.cid)
+      .map(n => ({ id: n.id, hidden: !cb.checked }));
+    nodesDS.update(updates);
+    updateSelectAllState();
+  });
+  item.innerHTML = `<div class="legend-dot" style="background:${c.color}"></div>
+    <span class="legend-label">${c.label}</span>
+    <span class="legend-count">${c.count}</span>`;
+  item.prepend(cb);
+  item.onclick = (e) => {
+    if (e.target === cb) return;
+    cb.checked = !cb.checked;
+    cb.dispatchEvent(new Event('change'));
+  };
+  legendEl.appendChild(item);
+});
+</script>
+<script>
+// Render hyperedges as shaded regions
+const hyperedges = [{"id": "claude_lesson_upload_flow", "label": "\uc218\uc5c5 \uc5c5\ub85c\ub4dc \ud750\ub984 (\uba54\ubaa8\u00b7\uc601\uc0c1 \u2192 \uc218\uc5c5 \ud398\uc774\uc9c0 \u2192 \uc218\uc5c5 \uae30\ub85d\u00b7\uce74\ud1a1)", "nodes": ["claude_\ube60\ub978_\uba54\ubaa8\ud568", "claude_\uc601\uc0c1_\uc5c5\ub85c\ub4dc_\ubc29\ubc95", "claude_\uc218\uc5c5_\ud398\uc774\uc9c0", "claude_\uc218\uc5c5_\uae30\ub85d_db", "claude_\uce74\ud1a1_\uc694\uc57d_\uba54\uc2dc\uc9c0"], "relation": "participate_in", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "CLAUDE.md"}, {"id": "index_spa_rendering", "label": "\ud574\uc2dc \ub77c\uc6b0\ud305 SPA \ub80c\ub354\ub9c1", "nodes": ["index_show", "index_homehtml", "index_pages", "index_proghtml", "index_setweek", "index_cine"], "relation": "implement", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "index.html"}, {"id": "index_trimester_programs", "label": "\uc2dc\uae30\ubcc4 \uc6b4\ub3d9 \ud504\ub85c\uadf8\ub7a8 (\ucd08\uae30\u00b7\uc911\uae30\u00b7\ud6c4\uae30)", "nodes": ["index_progs", "index_\uc784\uc2e0_\ucd08\uae30_\ud504\ub85c\uadf8\ub7a8", "index_\uc784\uc2e0_\uc911\uae30_\ud504\ub85c\uadf8\ub7a8", "index_\uc784\uc2e0_\ud6c4\uae30_\ud504\ub85c\uadf8\ub7a8", "index_proghtml"], "relation": "form", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "index.html"}, {"id": "media_s1_property_scene", "label": "Farmhouse property scene composition", "nodes": ["media_s1_modern_farmhouse", "media_s1_garden_landscape", "media_s1_gravel_driveway", "media_s1_forested_hills_sunrise"], "relation": "conceptually_related_to", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "media/s1.webp"}, {"id": "media_s2_cozy_scene_elements", "label": "Elements composing the cozy living-room scene", "nodes": ["media_s2_morning_sunlight", "media_s2_living_room_furniture", "media_s2_houseplants", "media_s2_neutral_peach_palette"], "relation": "conceptually_related_to", "confidence": "INFERRED", "confidence_score": 0.85, "source_file": "media/s2.webp"}, {"id": "media_s3_home_practice_setup", "label": "Home yoga/meditation practice setup", "nodes": ["media_s3_yoga_mat", "media_s3_meditation_cushion", "media_s3_exercise_ball"], "relation": "conceptually_related_to", "confidence": "INFERRED", "confidence_score": 0.85, "source_file": "media/s3.webp"}, {"id": "media_s4_meditation_setup", "label": "Home meditation setup props", "nodes": ["media_s4_yoga_mat", "media_s4_meditation_cushion", "media_s4_exercise_ball"], "confidence": "INFERRED", "confidence_score": 0.85, "source_file": "media/s4.webp"}];
+// afterDrawing passes ctx already transformed to network coordinate space.
+// Draw node positions raw — no manual pan/zoom/DPR math needed.
+
+// Andrew's monotone chain. Returns the hull in counter-clockwise order, which
+// is what the perimeter must be traced in. Collinear and duplicate points
+// collapse to the extremes, so degenerate member sets render as a segment
+// rather than a zero-area crossed path.
+function convexHull(pts) {
+    const p = pts.slice().sort((a, b) => (a.x - b.x) || (a.y - b.y));
+    if (p.length < 3) return p;
+    const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+    const build = seq => {
+        const out = [];
+        for (const q of seq) {
+            while (out.length >= 2 && cross(out[out.length - 2], out[out.length - 1], q) <= 0) out.pop();
+            out.push(q);
+        }
+        out.pop();
+        return out;
+    };
+    const hull = build(p).concat(build(p.slice().reverse()));
+    return hull.length >= 3 ? hull : p;
+}
+network.on('afterDrawing', function(ctx) {
+    hyperedges.forEach(h => {
+        const positions = h.nodes
+            .map(nid => network.getPositions([nid])[nid])
+            .filter(p => p !== undefined);
+        if (positions.length < 2) return;
+        ctx.save();
+        ctx.globalAlpha = 0.12;
+        ctx.fillStyle = '#6366f1';
+        ctx.strokeStyle = '#6366f1';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        // Centroid and expanded hull in network coordinates.
+        // The perimeter must follow hull order, not h.nodes order: tracing the
+        // raw member order self-intersects whenever the layout does not happen
+        // to place members in angular order, filling as crossed wedges.
+        const cx = positions.reduce((s, p) => s + p.x, 0) / positions.length;
+        const cy = positions.reduce((s, p) => s + p.y, 0) / positions.length;
+        const hull = convexHull(positions);
+        const expanded = hull.map(p => ({
+            x: cx + (p.x - cx) * 1.15,
+            y: cy + (p.y - cy) * 1.15
+        }));
+        ctx.moveTo(expanded[0].x, expanded[0].y);
+        expanded.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 0.4;
+        ctx.stroke();
+        // Label
+        ctx.globalAlpha = 0.8;
+        ctx.fillStyle = '#4f46e5';
+        ctx.font = 'bold 11px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(h.label, cx, cy - 5);
+        ctx.restore();
+    });
+});
+</script>
+</body>
+</html>
